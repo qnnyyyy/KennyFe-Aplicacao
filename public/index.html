@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0d0a14" />
+  <title>KennyFe 💞</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💞</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Anton&family=Bangers&family=Pacifico&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/app.css" />
+</head>
+<body>
+  <div class="bg-blobs" aria-hidden="true"><span></span><span></span><span></span></div>
+
+  <!-- ===== Login / Cadastro ===== -->
+  <section id="auth" class="auth hidden">
+    <div class="auth-card glass">
+      <div class="brand">
+        <div class="brand-logo">💞</div>
+        <h1>Kenny<span>Fe</span></h1>
+        <p>Nosso cantinho pra assistir, jogar e conversar juntinhos.</p>
+      </div>
+      <div class="auth-tabs" role="tablist">
+        <button class="active" data-tab="login" role="tab">Entrar</button>
+        <button data-tab="register" role="tab">Criar conta</button>
+        <span class="auth-tab-indicator"></span>
+      </div>
+      <form id="auth-form" autocomplete="on">
+        <label class="field register-only">
+          <span>Como quer ser chamado(a)</span>
+          <input class="input" name="displayName" maxlength="32" placeholder="Ex.: Kenny" autocomplete="nickname" />
+        </label>
+        <label class="field">
+          <span>Usuário</span>
+          <input class="input" name="username" required minlength="3" maxlength="24" placeholder="seu_usuario" autocomplete="username" autocapitalize="none" />
+        </label>
+        <label class="field">
+          <span>Senha</span>
+          <input class="input" name="password" type="password" required minlength="6" placeholder="••••••" autocomplete="current-password" />
+        </label>
+        <p class="auth-error" id="auth-error"></p>
+        <button class="btn btn-primary btn-lg" type="submit" id="auth-submit">Entrar</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- ===== Aplicativo ===== -->
+  <section id="app" class="app hidden">
+    <aside class="rail">
+      <div class="rail-brand" title="KennyFe">💞</div>
+      <div class="rail-sep"></div>
+      <nav id="group-rail" class="rail-groups"></nav>
+      <button class="rail-btn rail-add" id="btn-new-group" title="Criar ou entrar em um grupo">+</button>
+    </aside>
+
+    <aside class="sidebar">
+      <header class="sidebar-head">
+        <div class="sidebar-title" id="sidebar-title">Bem-vindo(a)</div>
+        <button class="icon-btn" id="btn-group-menu" title="Opções do grupo"></button>
+      </header>
+      <div class="sidebar-body">
+        <div class="channel" id="channel-chat"><span class="ch-ic">#</span> conversa</div>
+        <div class="channel voice" id="channel-voice"><span class="ch-ic" data-icon="volume"></span> call <span class="call-count" id="call-count"></span></div>
+        <div class="voice-users" id="voice-users"></div>
+        <div class="sidebar-section">Membros</div>
+        <div class="members" id="members"></div>
+      </div>
+      <div class="voice-panel hidden" id="voice-panel">
+        <div class="vp-status"><span class="vp-dot"></span><div><b>Na call</b><small id="vp-group"></small></div></div>
+        <button class="icon-btn danger" id="vp-leave" title="Sair da call"></button>
+      </div>
+      <footer class="me-bar">
+        <div class="me" id="me-card"></div>
+        <div class="me-actions">
+          <button class="icon-btn" id="me-mic" title="Mutar (Ctrl+Shift+M)"></button>
+          <button class="icon-btn" id="me-deaf" title="Ensurdecer (Ctrl+Shift+D)"></button>
+          <button class="icon-btn" id="me-settings" title="Configurações"></button>
+        </div>
+      </footer>
+    </aside>
+
+    <main class="main" id="main">
+      <!-- Tela inicial sem grupo -->
+      <div class="welcome" id="welcome">
+        <div class="welcome-inner">
+          <div class="welcome-heart">💞</div>
+          <h2>Oi, <span id="welcome-name"></span>!</h2>
+          <p>Crie um grupo pra vocês dois (ou pra galera) e chame quem quiser com o código de convite.</p>
+          <div class="welcome-actions">
+            <button class="btn btn-primary btn-lg" id="welcome-create">Criar grupo</button>
+            <button class="btn btn-ghost btn-lg" id="welcome-join">Entrar com convite</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Área do grupo: call (palco) + chat -->
+      <div class="room hidden" id="room">
+        <section class="stage-wrap hidden" id="stage-wrap">
+          <div class="stage" id="stage"></div>
+          <div class="stage-overlay-top">
+            <div class="stage-title" id="stage-title"></div>
+          </div>
+          <div class="call-controls" id="call-controls"></div>
+        </section>
+        <div class="room-resizer hidden" id="room-resizer" title="Arraste para ajustar"></div>
+        <section class="chat" id="chat">
+          <header class="chat-head">
+            <div class="chat-title"><span class="chat-icon" id="chat-icon"></span><b id="chat-name"></b></div>
+            <div class="chat-head-actions">
+              <button class="btn btn-call" id="btn-join-call"></button>
+              <button class="icon-btn" id="btn-toggle-chat" title="Esconder chat"></button>
+            </div>
+          </header>
+          <div class="messages" id="messages"></div>
+          <div class="typing" id="typing"></div>
+          <div class="composer-wrap">
+            <div class="reply-bar hidden" id="reply-bar"></div>
+            <div class="composer" id="composer">
+              <button class="icon-btn" id="btn-attach" title="Enviar arquivo"></button>
+              <textarea id="msg-input" rows="1" placeholder="Mensagem..." maxlength="4000"></textarea>
+              <button class="icon-btn" id="btn-gif" title="Figurinhas e GIFs"></button>
+              <button class="icon-btn" id="btn-emoji" title="Emojis"></button>
+              <button class="icon-btn send" id="btn-send" title="Enviar"></button>
+            </div>
+            <input type="file" id="file-input" hidden multiple />
+          </div>
+        </section>
+      </div>
+    </main>
+  </section>
+
+  <div id="layer"></div>
+  <div id="toasts"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>
