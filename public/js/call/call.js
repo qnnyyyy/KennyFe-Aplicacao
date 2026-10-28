@@ -354,7 +354,7 @@ export class CallController {
   }
 
   toggleCinema(force) {
-    document.body.classList.toggle('cinema', force);
+    if (document.body.classList.toggle('cinema', force)) this.socket.emit('track', { feature: 'cinema' });
     this.renderControls();
     this.stage.scheduleRender();
   }
@@ -713,6 +713,7 @@ export class CallController {
   // ---------- Gravar clipe de um bloco ----------
   startRecording(t) {
     const { info, key } = t;
+    this.socket.emit('track', { feature: 'clip' });
     const tracks = [...info.stream.getVideoTracks()];
     // junta o áudio certo: da transmissão (telas) ou a voz da pessoa (câmera)
     if (info.isLocal) {
@@ -773,6 +774,7 @@ export class CallController {
     const play = async (item, btn) => {
       try {
         btn.classList.add('playing');
+        this.socket.emit('track', { feature: 'soundboard' });
         const src = this.media.playSound(await this.loadSound(item));
         src.onended = () => btn.classList.remove('playing');
       } catch (err) {

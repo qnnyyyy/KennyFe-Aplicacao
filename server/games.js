@@ -2,6 +2,7 @@
 // guarda o estado, valida as jogadas e manda para cada um só o que ele pode ver.
 const { db } = require('./db');
 const { isMember } = require('./routes');
+const stats = require('./stats');
 
 const WORDS = `abacaxi abelha avião baleia banana bicicleta boné borboleta bota cachorro cadeira café caminhão
 camisa caneta carro castelo cavalo celular chapéu chave chocolate chuva cobra coelho computador coração
@@ -219,6 +220,7 @@ const GAMES = {
         st.seed = Math.floor(Math.random() * 2 ** 31);
         st.startAt = now() + 3500;
         st.playing = s.players.map(() => true);
+        s.players.forEach((uid) => stats.track(uid, 'tetris_round'));
         st.alive = s.players.map(() => true);
         st.places = s.players.map(() => null);
         st.winner = null;
@@ -370,6 +372,7 @@ function attachGames(io, hub) {
       endSession(groupId);
       const s = { groupId, type, hostId: userId, players: [userId], names: [userName(userId)], scores: [0], state: GAMES[type].init(), timer: null };
       sessions.set(groupId, s);
+      stats.track(userId, 'game_' + type);
       hub.broadcastMessage(require('./routes').createMessage({ groupId, userId, type: 'system', content: `abriu uma partida de ${GAMES[type].name} 🎮 — vem jogar!` }));
       hub.emitGame(s);
       ack?.({ ok: true });
@@ -383,6 +386,7 @@ function attachGames(io, hub) {
       if (s.players.length >= def.max) return ack?.({ error: 'A partida está cheia.' });
       const inProgress = s.type === 'draw' ? s.state.phase !== 'lobby' && s.state.phase !== 'over' : false;
       s.players.push(userId);
+      stats.track(userId, 'game_join');
       s.names.push(userName(userId));
       s.scores.push(0);
       if (inProgress) s.state.order.push(s.players.length - 1);

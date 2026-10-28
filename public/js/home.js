@@ -3,6 +3,7 @@ import { el, $, icon, avatar, toast, contextMenu, onContext, sfx, timeAgo } from
 import { api } from './api.js';
 import { openProfile, activityLine } from './profile.js';
 import { gameEmoji } from './gamesdata.js';
+import { AdminPanel } from './admin.js';
 
 export class Home {
   constructor(app, { selectGroup, newGroupDialog }) {
@@ -10,6 +11,7 @@ export class Home {
     this.selectGroup = selectGroup;
     this.newGroupDialog = newGroupDialog;
     this.tab = 'online';
+    this.page = 'friends'; // friends | admin (painel do dono do site)
     this.friends = [];
     this.root = $('#home');
     this.side = $('#home-side');
@@ -75,7 +77,8 @@ export class Home {
     const onHome = !app.currentGroupId;
     const dms = this.dms();
     this.side.replaceChildren(
-      el('button', { class: `side-nav ${onHome ? 'active' : ''}`, onclick: () => this.selectGroup(null) }, icon('users', 18), el('span', {}, 'Amigos'), this.pending.length ? el('span', { class: 'count-badge' }, this.pending.length) : null),
+      el('button', { class: `side-nav ${onHome && this.page === 'friends' ? 'active' : ''}`, onclick: () => this.go('friends') }, icon('users', 18), el('span', {}, 'Amigos'), this.pending.length ? el('span', { class: 'count-badge' }, this.pending.length) : null),
+      ...(app.me.isAdmin ? [el('button', { class: `side-nav ${onHome && this.page === 'admin' ? 'active' : ''}`, onclick: () => this.go('admin') }, el('span', { class: 'ic' }, '📊'), el('span', {}, 'Painel do site'))] : []),
       el('button', { class: 'side-nav', onclick: () => this.newGroupDialog('create') }, icon('plus', 18), el('span', {}, 'Criar grupo')),
       el('div', { class: 'sidebar-section with-action' }, el('span', {}, 'Conversas diretas'),
         el('button', { class: 'icon-btn sm', title: 'Nova conversa', onclick: (e) => this.dmPicker(e.clientX, e.clientY) }, icon('plus', 14))),
@@ -110,9 +113,17 @@ export class Home {
     ]);
   }
 
+  go(page) {
+    this.page = page;
+    if (page !== 'admin') this.admin?.hide();
+    this.selectGroup(null);
+  }
+
   // ---------------- área principal ----------------
   render() {
     const app = this.app;
+    if (this.page === 'admin' && app.me.isAdmin) return this.renderAdmin();
+    this.admin?.hide();
     const accepted = this.friends.filter((f) => f.status === 'accepted');
     const online = accepted.filter((f) => app.online.has(f.user.id));
     const pending = this.friends.filter((f) => f.status !== 'accepted');
@@ -142,6 +153,17 @@ export class Home {
     this.root.replaceChildren(head, el('div', { class: 'home-body' }, el('section', { class: 'home-main' }, this.hero(), main), this.nowPanel()));
   }
 
+  renderAdmin() {
+    this.admin ||= new AdminPanel(this.app);
+    // o painel tem estado próprio (busca, ordenação): reaproveita o mesmo elemento
+    if (this.root.querySelector('.admin') === this.admin.root) return;
+    this.admin.show();
+    const head = el('header', { class: 'home-head' },
+      el('button', { class: 'icon-btn mobile-only', onclick: () => $('#app').classList.toggle('nav-open') }, icon('more', 18)),
+      el('div', { class: 'home-title keep' }, el('span', {}, '📊'), el('b', {}, 'Painel do site')));
+    this.root.replaceChildren(head, el('div', { class: 'home-body' }, el('section', { class: 'home-main admin-main' }, this.admin.root)));
+  }
+
   hero() {
     const me = this.app.me;
     return el('div', { class: 'home-hero' },
@@ -151,7 +173,9 @@ export class Home {
       el('div', { class: 'hero-actions' },
         el('button', { class: 'btn btn-primary', onclick: () => { this.tab = 'add'; this.render(); } }, icon('plus', 16), 'Adicionar amigo'),
         el('button', { class: 'btn btn-ghost', onclick: () => this.newGroupDialog('create') }, '✨ Criar grupo'),
-        el('button', { class: 'btn btn-ghost', onclick: () => this.newGroupDialog('join') }, '🔗 Entrar com convite'))
+        el('button', { class: 'btn btn-ghost', onclick: () => this.newGroupDialog('join') }, '🔗 Entrar com convite')),
+      me.email ? null : el('div', { class: 'email-nudge' }, '📧 Sua conta ainda não tem e-mail.',
+        el('button', { class: 'btn btn-ghost btn-sm', onclick: () => this.app.openSettings('account') }, 'Adicionar e-mail'))
     );
   }
 

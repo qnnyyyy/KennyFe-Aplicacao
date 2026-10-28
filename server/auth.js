@@ -53,6 +53,12 @@ function publicUser(u) {
   };
 }
 
+// o próprio usuário recebe também o e-mail e se é o dono do site (isso nunca vai para os outros)
+function selfUser(u) {
+  if (!u) return null;
+  return { ...publicUser(u), email: u.email || null, isAdmin: require('./stats').isAdmin(u) };
+}
+
 function createSession(userId) {
   const token = crypto.randomBytes(32).toString('base64url');
   const expires = Math.floor(Date.now() / 1000) + SESSION_DAYS * 86400;
@@ -112,6 +118,7 @@ module.exports = {
   hashPassword,
   verifyPassword,
   publicUser,
+  selfUser,
   FRAMES,
   createSession,
   userFromToken,

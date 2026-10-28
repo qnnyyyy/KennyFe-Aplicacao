@@ -296,6 +296,7 @@ export class CoopController {
     if (st === 'pending') return;
     if (!this.call.pm.sendData(peerId, { t: 'coop-req', screenId })) return toast('Conexão ainda não está pronta, tente de novo em 1 segundo.', 'error');
     this.pending.add(`${peerId}:${screenId}`);
+    this.call.socket.emit('track', { feature: 'coop_guest' });
     toast('Pedido enviado — esperando o host aceitar…');
     this.call.refreshTiles();
   }

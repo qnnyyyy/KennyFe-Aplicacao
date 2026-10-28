@@ -59,6 +59,7 @@ function showAuth() {
     form.classList.toggle('register', m === 'register');
     $('#auth-submit').textContent = m === 'login' ? 'Entrar' : 'Criar conta';
     form.password.autocomplete = m === 'login' ? 'current-password' : 'new-password';
+    form.email.required = m === 'register';
     $('#auth-error').textContent = '';
   };
   $$('.auth-tabs button').forEach((b) => (b.onclick = () => setMode(b.dataset.tab)));
@@ -70,7 +71,7 @@ function showAuth() {
     btn.disabled = true;
     $('#auth-error').textContent = '';
     try {
-      const body = { username: form.username.value, password: form.password.value, displayName: form.displayName.value, accessCode: form.accessCode.value };
+      const body = { username: form.username.value, password: form.password.value, displayName: form.displayName.value, email: form.email.value, accessCode: form.accessCode.value };
       const { user } = await api.post(mode === 'login' ? '/auth/login' : '/auth/register', body);
       start(user);
     } catch (err) {

@@ -59,6 +59,7 @@ function accountPane(app) {
   const preview = el('div', { class: 'profile-preview-wrap' });
   const name = el('input', { class: 'input', value: me.displayName, maxlength: 32 });
   const status = el('input', { class: 'input', value: me.statusText || '', maxlength: 80, placeholder: 'Ex.: bora de ranked? 🎮' });
+  const email = el('input', { class: 'input', type: 'email', value: me.email || '', maxlength: 120, placeholder: 'voce@email.com', autocomplete: 'email' });
   const bio = el('textarea', { class: 'input', rows: 3, maxlength: 300, placeholder: 'Conta um pouco sobre você, seu main, seu horário de jogo…' }, me.bio || '');
   const current = () => ({ ...me, ...draft, displayName: name.value || me.username, statusText: status.value, bio: bio.value });
   const renderPreview = () => preview.replaceChildren(profileCard(app, current(), { preview: true }));
@@ -135,7 +136,7 @@ function accountPane(app) {
     class: 'btn btn-primary',
     onclick: async () => {
       try {
-        const body = { displayName: name.value, statusText: status.value, bio: bio.value, ...draft, avatarUrl: draft.avatarUrl || null, bannerUrl: draft.bannerUrl || null };
+        const body = { displayName: name.value, statusText: status.value, bio: bio.value, ...(email.value.trim() || me.email ? { email: email.value } : {}), ...draft, avatarUrl: draft.avatarUrl || null, bannerUrl: draft.bannerUrl || null };
         if (newPass.value) Object.assign(body, { currentPassword: curPass.value, newPassword: newPass.value });
         const { user } = await api.patch('/me', body);
         app.setMe(user);
@@ -161,6 +162,7 @@ function accountPane(app) {
           ),
           el('label', { class: 'field' }, el('span', {}, 'Nome de exibição'), name),
           el('label', { class: 'field' }, el('span', {}, 'Recado'), status),
+          el('label', { class: 'field' }, el('span', {}, 'E-mail (só você vê)'), email),
           el('label', { class: 'field' }, el('span', {}, 'Sobre mim'), bio),
           el('div', { class: 'grid-2' },
             el('div', { class: 'field' }, el('span', {}, 'Cor do nome/avatar'), swatches(PROFILE_COLORS, 'color')),

@@ -105,7 +105,13 @@ Funciona como um coop local pela internet. **Quem transmite continua jogando nor
 ### Início (amigos e conversas diretas)
 - Ao entrar no site você cai no **Início**, como no Discord: lista de amigos (online / todos / pendentes), **adicionar amigo pelo @**, conversas diretas (DM) com chat e call, quem está **jogando agora** e as **calls rolando** com botão de entrar.
 
+### Painel do site (só o dono)
+- No Início aparece **📊 Painel do site** apenas para a conta do dono (`ADMIN_USERNAMES`, padrão `kenny_maciel`). Para qualquer outra conta a página e a API (`/api/admin/stats`) nem existem.
+- Mostra: contas, quem está online, ativos por dia (30 dias), cadastros por dia, horas de uso e em call, **lista de quem se inscreveu com e-mail**, data de cadastro, último acesso, tempo de uso de cada um e as **funções mais usadas** (no geral e por pessoa).
+- O tempo de uso conta enquanto o site está aberto; as funções começam a ser contadas a partir desta versão (mensagens antigas já entram na contagem por pessoa).
+
 ### Contas e grupos
+- Cadastro pede **e-mail** (contas antigas podem adicionar em Configurações → Perfil; o e-mail só a própria pessoa e o dono veem).
 - Login/cadastro com senha protegida (scrypt) e sessão em cookie httpOnly. Cada conta tem seus próprios dados (perfil, coleção de figurinhas, grupos).
 - Grupos com ícone, convite por código ou por @usuário, membros online, quem está na call, notificações.
 
@@ -126,12 +132,15 @@ server/
   games.js    minijogos multiplayer (o servidor é o juiz)
   tetris-skins.js  estilos de torre do Tetris e o XP de cada um
   hub.js      tempo real: presença, chat e sinalização WebRTC
+  stats.js    estatísticas do Painel do site (tempo de uso, funções usadas)
 public/
   js/main.js          login, grupos e navegação
   js/chat.js          chat, emojis, figurinhas
   js/creator.js       estúdio de figurinhas e GIFs
   js/settings-ui.js   configurações e edição de perfil
   js/profile.js       cartão de perfil
+  js/home.js          Início (amigos, conversas diretas)
+  js/admin.js         Painel do site (só o dono)
   js/games.js         aba Jogos (minijogos + catálogo)
   js/tetris.js        Tetris Royale: motor, estilos e interface
   js/call/            chamada: rtc (conexões), media (mic/câmera/telas), audio (volumes),

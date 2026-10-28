@@ -5,6 +5,17 @@ const express = require('express');
 const multer = require('multer');
 const { db, UPLOAD_DIR } = require('./db');
 const auth = require('./auth');
+const stats = require('./stats');
+
+// e-mail: minúsculo, formato simples, sem repetir conta
+function checkEmail(raw, username, exceptUserId = 0) {
+  const email = String(raw || '').trim().toLowerCase();
+  if (!email) return { error: 'Coloque seu e-mail.' };
+  if (email.length > 120 || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return { error: 'E-mail inválido.' };
+  if (stats.emailReserved(email, username) || db.prepare('SELECT 1 FROM users WHERE email = ? COLLATE NOCASE AND id != ?').get(email, exceptUserId))
+    return { error: 'Esse e-mail já está em uso por outra conta.' };
+  return { email };
+}
 
 const ALLOWED_MIME = {
   'image/png': '.png',
@@ -171,12 +182,14 @@ function buildRouter(io, hub) {
     if (displayName.length > 32) return res.status(400).json({ error: 'Nome muito longo (máx. 32).' });
     if (db.prepare('SELECT 1 FROM users WHERE username = ?').get(username))
       return res.status(409).json({ error: 'Esse usuário já existe.' });
+    const em = checkEmail(req.body.email, username);
+    if (em.error) return res.status(400).json({ error: em.error });
     const info = db
-      .prepare('INSERT INTO users (username, display_name, password_hash, color) VALUES (?, ?, ?, ?)')
-      .run(username, displayName, auth.hashPassword(password), auth.randomColor());
+      .prepare('INSERT INTO users (username, display_name, password_hash, color, email) VALUES (?, ?, ?, ?, ?)')
+      .run(username, displayName, auth.hashPassword(password), auth.randomColor(), em.email);
     const token = auth.createSession(info.lastInsertRowid);
     auth.setSessionCookie(req, res, token);
-    res.json({ user: auth.publicUser(db.prepare('SELECT * FROM users WHERE id = ?').get(info.lastInsertRowid)) });
+    res.json({ user: auth.selfUser(db.prepare('SELECT * FROM users WHERE id = ?').get(info.lastInsertRowid)) });
   });
 
   r.post('/auth/login', rateLimit(10, 5 * 60e3), (req, res) => {
@@ -185,7 +198,8 @@ function buildRouter(io, hub) {
     if (!user || !auth.verifyPassword(String(req.body.password || ''), user.password_hash))
       return res.status(401).json({ error: 'Usuário ou senha incorretos.' });
     auth.setSessionCookie(req, res, auth.createSession(user.id));
-    res.json({ user: auth.publicUser(user) });
+    stats.track(user.id, 'login');
+    res.json({ user: auth.selfUser(user) });
   });
 
   r.post('/auth/logout', (req, res) => {
@@ -211,7 +225,14 @@ function buildRouter(io, hub) {
 
   r.use(auth.requireAuth);
 
-  r.get('/me', (req, res) => res.json({ user: auth.publicUser(req.user) }));
+  r.get('/me', (req, res) => res.json({ user: auth.selfUser(req.user) }));
+
+  // painel do dono do site
+  r.get('/admin/stats', (req, res) => {
+    if (!stats.isAdmin(req.user)) return res.status(404).json({ error: 'Não encontrado.' });
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(stats.adminStats(hub.online));
+  });
 
   r.patch('/me', (req, res) => {
     const u = req.user;
@@ -240,11 +261,17 @@ function buildRouter(io, hub) {
       if (String(req.body.newPassword).length < 6) return res.status(400).json({ error: 'Nova senha muito curta.' });
       db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(auth.hashPassword(String(req.body.newPassword)), u.id);
     }
+    if (req.body.email !== undefined && String(req.body.email || '').trim().toLowerCase() !== (u.email || '')) {
+      const em = checkEmail(req.body.email, u.username, u.id);
+      if (em.error) return res.status(400).json({ error: em.error });
+      db.prepare('UPDATE users SET email = ? WHERE id = ?').run(em.email, u.id);
+    }
+    stats.track(u.id, 'profile_edit');
     const fresh = db.prepare('SELECT * FROM users WHERE id = ?').get(u.id);
     // Avisa todo mundo que compartilha grupo com o usuário
     const groupIds = db.prepare('SELECT group_id FROM group_members WHERE user_id = ?').all(u.id);
     groupIds.forEach(({ group_id }) => notifyGroup(group_id));
-    res.json({ user: auth.publicUser(fresh) });
+    res.json({ user: auth.selfUser(fresh) });
   });
 
   // "Jogando agora": definido à mão, pelo agente do PC ou ao transmitir um jogo
@@ -295,6 +322,7 @@ function buildRouter(io, hub) {
       return res.json({ ok: true, accepted: true });
     }
     db.prepare('INSERT INTO friendships (user_id, friend_id) VALUES (?, ?)').run(req.user.id, other.id);
+    stats.track(req.user.id, 'friend_add');
     hub.friendsChanged([req.user.id, other.id], { type: 'request', by: req.user.id });
     res.json({ ok: true });
   });
@@ -330,6 +358,7 @@ function buildRouter(io, hub) {
       db.prepare('INSERT INTO group_members (group_id, user_id) VALUES (?, ?), (?, ?)').run(info.lastInsertRowid, req.user.id, info.lastInsertRowid, other.id);
       g = db.prepare('SELECT * FROM groups WHERE id = ?').get(info.lastInsertRowid);
     }
+    stats.track(req.user.id, 'dm_open');
     notifyGroup(g.id);
     res.json({ group: groupPayload(g) });
   });
@@ -348,6 +377,7 @@ function buildRouter(io, hub) {
     if (!name) return res.status(400).json({ error: 'Dê um nome ao grupo.' });
     const info = db.prepare('INSERT INTO groups (name, icon, owner_id, invite_code) VALUES (?, ?, ?, ?)').run(name, icon, req.user.id, inviteCode());
     db.prepare("INSERT INTO group_members (group_id, user_id, role) VALUES (?, ?, 'owner')").run(info.lastInsertRowid, req.user.id);
+    stats.track(req.user.id, 'group_create');
     notifyGroup(info.lastInsertRowid);
     res.json({ group: groupPayload(db.prepare('SELECT * FROM groups WHERE id = ?').get(info.lastInsertRowid)) });
   });
@@ -359,6 +389,7 @@ function buildRouter(io, hub) {
     if (!isMember(g.id, req.user.id)) {
       db.prepare('INSERT INTO group_members (group_id, user_id) VALUES (?, ?)').run(g.id, req.user.id);
       hub.broadcastMessage(createMessage({ groupId: g.id, userId: req.user.id, type: 'system', content: 'entrou no grupo 🎉' }));
+      stats.track(req.user.id, 'group_join');
     }
     notifyGroup(g.id);
     res.json({ group: groupPayload(g) });
@@ -434,6 +465,7 @@ function buildRouter(io, hub) {
         .prepare('INSERT INTO stickers (owner_id, kind, url, name) VALUES (?, ?, ?, ?)')
         .run(req.user.id, purpose, url, String(req.body.name || '').slice(0, 40));
       sticker = { id: Number(info.lastInsertRowid), kind: purpose, url, name: String(req.body.name || '') };
+      stats.track(req.user.id, `${purpose}_create`);
     }
     res.json({ url, name: req.file.originalname, size: req.file.size, mime: req.file.mimetype, sticker });
   });

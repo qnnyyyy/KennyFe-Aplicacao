@@ -75,7 +75,9 @@ async function main() {
   // Arquivos enviados só para quem está logado
   app.use('/uploads', auth.requireAuth, express.static(UPLOAD_DIR, { maxAge: '30d', immutable: true }));
   // App do Modo Coop (Windows): um .exe só, com o controle virtual embutido
-  app.get('/download/KenfehCoop.exe', (_req, res) => {
+  app.get('/download/KenfehCoop.exe', (req, res) => {
+    const u = auth.userFromToken(auth.tokenFromReq(req));
+    if (u) require('./stats').track(u.id, 'coop_download');
     res.setHeader('Content-Disposition', 'attachment; filename="KenfehCoop.exe"');
     res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(path.join(__dirname, '..', 'agent', 'dist', 'KenfehCoop.exe'));

@@ -94,6 +94,9 @@ addUserCol('show_activity', 'INTEGER NOT NULL DEFAULT 1');
 addUserCol('activity', 'TEXT'); // JSON { name, since, source }
 addUserCol('tetris_xp', 'INTEGER NOT NULL DEFAULT 0');
 addUserCol('tetris_skin', "TEXT NOT NULL DEFAULT 'classic'");
+addUserCol('email', 'TEXT');
+addUserCol('last_seen', 'INTEGER');
+db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email COLLATE NOCASE) WHERE email IS NOT NULL");
 
 // Amizades (user_id pediu para friend_id) e conversas diretas (grupos is_dm)
 db.exec(`

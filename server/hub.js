@@ -2,6 +2,24 @@
 const { db } = require('./db');
 const auth = require('./auth');
 const { isMember, createMessage, messagePayload, groupPayload } = require('./routes');
+const stats = require('./stats');
+
+// o que a pessoa ligou na call (para as estatísticas): conta cada tela/câmera nova uma vez
+function trackStreams(socket, userId, state) {
+  const seen = socket.data.seenStreams || (socket.data.seenStreams = new Set());
+  for (const [id, m] of Object.entries(state?.streams || {})) {
+    if (seen.has(id) || !m || (m.type !== 'screen' && m.type !== 'camera')) continue;
+    seen.add(id);
+    stats.track(userId, m.type === 'camera' ? 'camera' : 'screen_share');
+  }
+  for (const [id, m] of Object.entries(state?.streams || {})) {
+    const key = 'coop:' + id;
+    if (m?.coop && !seen.has(key)) {
+      seen.add(key);
+      stats.track(userId, 'coop_host');
+    }
+  }
+}
 
 function createHub(io) {
   const online = new Map(); // userId -> Set<socket>
@@ -20,6 +38,7 @@ function createHub(io) {
   const emitPresence = () => io.emit('presence', { online: [...online.keys()] });
 
   const hub = {
+    usage: null,
     refreshUserGroups(userId) {
       const sockets = online.get(userId);
       if (!sockets) return;
@@ -61,6 +80,7 @@ function createHub(io) {
     const groupId = socket.data.callGroup;
     if (!groupId) return;
     const call = calls.get(groupId);
+    hub.usage?.flush(socket.data.userId);
     socket.data.callGroup = null;
     socket.leave(`call:${groupId}`);
     if (call) {
@@ -83,6 +103,7 @@ function createHub(io) {
     const userId = socket.data.userId;
     if (!online.has(userId)) online.set(userId, new Set());
     online.get(userId).add(socket);
+    hub.usage.connected(userId);
 
     userGroupIds(userId).forEach((gid) => socket.join(`group:${gid}`));
     hub.refreshUserGroups(userId);
@@ -103,6 +124,8 @@ function createHub(io) {
       if (replyTo && !db.prepare('SELECT 1 FROM messages WHERE id = ? AND group_id = ?').get(replyTo, groupId)) replyTo = null;
       const msg = createMessage({ groupId, userId, type, content, mediaUrl, replyTo });
       hub.broadcastMessage(msg);
+      const isDm = db.prepare('SELECT is_dm FROM groups WHERE id = ?').get(groupId)?.is_dm;
+      stats.track(userId, type === 'text' ? (isDm ? 'dm_message' : 'message') : type === 'sticker' || type === 'gif' ? type : 'media');
       ack?.({ message: msg });
     });
 
@@ -118,7 +141,10 @@ function createHub(io) {
       if (!m || !emoji || !isMember(m.group_id, userId)) return;
       const exists = db.prepare('SELECT 1 FROM reactions WHERE message_id = ? AND user_id = ? AND emoji = ?').get(m.id, userId, emoji);
       if (exists) db.prepare('DELETE FROM reactions WHERE message_id = ? AND user_id = ? AND emoji = ?').run(m.id, userId, emoji);
-      else db.prepare('INSERT INTO reactions (message_id, user_id, emoji) VALUES (?, ?, ?)').run(m.id, userId, emoji);
+      else {
+        db.prepare('INSERT INTO reactions (message_id, user_id, emoji) VALUES (?, ?, ?)').run(m.id, userId, emoji);
+        stats.track(userId, 'reaction');
+      }
       io.to(`group:${m.group_id}`).emit('chat:update', messagePayload(m));
     });
 
@@ -146,6 +172,9 @@ function createHub(io) {
       const call = calls.get(groupId);
       const peers = callSnapshot(groupId);
       const wasEmpty = call.size === 0;
+      hub.usage.flush(userId);
+      stats.track(userId, 'call');
+      trackStreams(socket, userId, p.state);
       call.set(socket.id, { userId, state: p.state || {} });
       socket.data.callGroup = groupId;
       socket.join(`call:${groupId}`);
@@ -162,6 +191,7 @@ function createHub(io) {
       const entry = groupId && calls.get(groupId)?.get(socket.id);
       if (!entry) return;
       entry.state = p.state || {};
+      trackStreams(socket, userId, entry.state);
       socket.to(`call:${groupId}`).emit('call:peer-state', { peerId: socket.id, state: entry.state });
       emitCallList(groupId);
     });
@@ -172,12 +202,18 @@ function createHub(io) {
       io.to(p.to).emit('rtc:signal', { from: socket.id, data: p.data });
     });
 
+    // funções que só o navegador sabe que foram usadas (lista fechada)
+    socket.on('track', (p = {}) => {
+      if (stats.CLIENT_FEATURES.has(p.feature)) stats.track(userId, p.feature);
+    });
+
     socket.on('disconnect', () => {
       leaveCall(socket);
       const set = online.get(userId);
       if (set) {
         set.delete(socket);
         if (!set.size) {
+          hub.usage.disconnected(userId);
           online.delete(userId);
           // saiu de vez: limpa o "jogando agora" automático (o escrito à mão fica)
           const row = db.prepare('SELECT activity FROM users WHERE id = ?').get(userId);
@@ -195,6 +231,7 @@ function createHub(io) {
     });
   });
 
+  hub.usage = stats.attachUsage(hub);
   return hub;
 }
 
