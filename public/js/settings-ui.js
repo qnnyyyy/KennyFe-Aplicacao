@@ -119,6 +119,7 @@ function accountPane(app) {
   // Galerias com filtro por tema (anime, jogos, geek…)
   // Só monta quando a seção é aberta (cada opção anima, então montar tudo de uma vez travava a tela).
   // Escolher uma opção só troca a marcação (sync) em vez de recriar a grade inteira.
+  const mine = (list) => list.filter((x) => !x.owner || me.isAdmin);
   const gallery = (items, render, isActive, cats = COS_CATS.filter((c) => c[0] !== 'basico' || items.some((x) => x.cat === 'basico'))) => {
     let cat = 'all';
     let ready = false;
@@ -152,17 +153,17 @@ function accountPane(app) {
   const avatarsG = gallery(AVATARS, (a) => el('button', { class: 'cos-opt', title: a.name, onclick: () => { draft.avatarUrl = a.url; avatarsG.sync(); renderPreview(); } },
     el('img', { src: a.url, alt: '', loading: 'lazy' }), el('small', {}, a.name)), (a) => draft.avatarUrl === a.url);
   // Fundos animados
-  const bannersG = gallery(BANNERS, (b) => el('button', { class: 'cos-opt', title: b.name, onclick: () => { draft.bannerUrl = 'theme:' + b.id; bannersG.sync(); renderPreview(); } },
+  const bannersG = gallery(mine(BANNERS), (b) => el('button', { class: 'cos-opt', title: b.name, onclick: () => { draft.bannerUrl = 'theme:' + b.id; bannersG.sync(); renderPreview(); } },
     el('div', { class: `bnr-prev bnr bnr-${b.id}` }), el('small', {}, b.name)), (b) => draft.bannerUrl === 'theme:' + b.id);
   bannersG.grid.classList.add('wide');
   // Decorações que passam da foto e efeitos no cartão
-  const decosG = gallery(DECOS, (d) => el('button', { class: 'cos-opt deco-opt', title: d.name, onclick: () => { draft.deco = d.id; decosG.sync(); renderPreview(); } },
+  const decosG = gallery(mine(DECOS), (d) => el('button', { class: 'cos-opt deco-opt', title: d.name, onclick: () => { draft.deco = d.id; decosG.sync(); renderPreview(); } },
     avatar({ ...current(), frame: 'none', deco: d.id }, 46), el('small', {}, d.name)), (d) => draft.deco === d.id);
   const effectsG = gallery(EFFECTS, (x) => el('button', { class: 'cos-opt', title: x.name, onclick: () => { draft.effect = x.id; effectsG.sync(); renderPreview(); } },
     el('div', { class: 'fx-prev' }, x.id !== 'none' ? el('img', { src: `/img/fx/${x.id}.svg`, alt: '' }) : '—'), el('small', {}, x.name)), (x) => draft.effect === x.id);
   effectsG.grid.classList.add('wide');
   // Temas completos (um clique aplica fundo + decoração + nameplate + badges)
-  const themesG = gallery(THEMES, (t) => el('button', { class: 'cos-opt theme-opt', title: t.name, onclick: () => {
+  const themesG = gallery(mine(THEMES), (t) => el('button', { class: 'cos-opt theme-opt', title: t.name, onclick: () => {
     draft.theme = t.id;
     if (t.deco) { draft.deco = t.deco; draft.frame = 'none'; }
     if (t.banner) draft.bannerUrl = t.banner;
@@ -170,7 +171,7 @@ function accountPane(app) {
   } },
     t.id === 'none' ? el('div', { class: 'theme-prev none' }, '—')
       : el('div', { class: `theme-prev pt pt-${t.id}` }, el('div', { class: `bnr bnr-${t.banner.slice(6)}` }), avatar({ ...current(), frame: 'none', deco: t.deco }, 40)),
-    el('small', {}, t.name)), (t) => draft.theme === t.id);
+    el('small', {}, t.owner ? '👑 ' + t.name : t.name)), (t) => draft.theme === t.id);
   themesG.grid.classList.add('wide');
 
   // Jogos favoritos

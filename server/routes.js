@@ -250,11 +250,13 @@ function buildRouter(io, hub) {
     const avatarUrl = req.body.avatarUrl !== undefined ? (cos.validAvatar(String(req.body.avatarUrl || '')) ? req.body.avatarUrl : null) : u.avatar_url;
     const bio = req.body.bio !== undefined ? String(req.body.bio).slice(0, 300) : u.bio;
     const bannerColor = /^#[0-9a-f]{6}$/i.test(req.body.bannerColor || '') ? req.body.bannerColor : u.banner_color;
-    const bannerUrl = req.body.bannerUrl !== undefined ? (cos.validBanner(String(req.body.bannerUrl || '')) ? req.body.bannerUrl : null) : u.banner_url;
+    const owner = stats.isAdmin(u);
+    const allowed = (v) => owner || !cos.OWNER_ONLY.includes(v);
+    const bannerUrl = req.body.bannerUrl !== undefined ? (cos.validBanner(String(req.body.bannerUrl || '')) && allowed(req.body.bannerUrl) ? req.body.bannerUrl : null) : u.banner_url;
     const frame = auth.FRAMES.includes(req.body.frame) ? req.body.frame : u.frame;
-    if (cos.DECOS.includes(req.body.deco)) db.prepare('UPDATE users SET deco = ? WHERE id = ?').run(req.body.deco, u.id);
+    if (cos.DECOS.includes(req.body.deco) && allowed(req.body.deco)) db.prepare('UPDATE users SET deco = ? WHERE id = ?').run(req.body.deco, u.id);
     if (cos.EFFECTS.includes(req.body.effect)) db.prepare('UPDATE users SET effect = ? WHERE id = ?').run(req.body.effect, u.id);
-    if (cos.THEMES.includes(req.body.theme)) db.prepare('UPDATE users SET theme = ? WHERE id = ?').run(req.body.theme, u.id);
+    if (cos.THEMES.includes(req.body.theme) && allowed(req.body.theme)) db.prepare('UPDATE users SET theme = ? WHERE id = ?').run(req.body.theme, u.id);
     const favoriteGames = Array.isArray(req.body.favoriteGames)
       ? JSON.stringify([...new Set(req.body.favoriteGames.map((g) => String(g).trim().slice(0, 40)).filter(Boolean))].slice(0, 12))
       : u.favorite_games;

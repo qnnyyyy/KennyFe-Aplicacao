@@ -321,6 +321,51 @@
 .pt .btn-ghost { background: transparent; color: var(--dg-text); box-shadow: inset 0 0 0 1px var(--dg-border); }
 .pt-cyber.profile-card, .pt-cyber .pt-nameplate, .pt-cyber .pc-body { border-radius: 0; }
 .pt-gamer .btn { border-radius: 0; font-family: "Press Start 2P", monospace; font-size: 10px; }
+.pt-oni { --dg-bg: #0c0505; --dg-surface: #170a0a; --dg-surface-2: #211010; --dg-border: #4a1a14; --dg-iron: #2a2a2a; --dg-iron-light: #ffc23d; --dg-accent: #d01a1a; --dg-hot: #ffc23d; --dg-deep: #3a0505; --dg-ember: #ff5a42; --dg-text: #fff0e6; --dg-muted: #c8a8a0; --dg-font-display: "Shippori Mincho", Georgia, serif; --dg-display-size: 1; }
+.pt-serpente { --dg-bg: #050c08; --dg-surface: #0b1710; --dg-surface-2: #112018; --dg-border: #1f4a30; --dg-iron: #3a2a05; --dg-iron-light: #fff0b0; --dg-accent: #14a85e; --dg-hot: #7dffb8; --dg-deep: #05401f; --dg-ember: #ffc23d; --dg-text: #eafff2; --dg-muted: #9ec0aa; --dg-font-display: "Cinzel", Georgia, serif; --dg-display-size: 1; }
+.pt-kraken { --dg-bg: #050a16; --dg-surface: #0a1426; --dg-surface-2: #0f1c34; --dg-border: #1f3a66; --dg-iron: #2a5a9a; --dg-iron-light: #8fd0ff; --dg-accent: #1e6fd0; --dg-hot: #5ab8ff; --dg-deep: #0a1a4a; --dg-ember: #ff7a5a; --dg-text: #eaf6ff; --dg-muted: #9ab4cc; --dg-font-display: "Pirata One", Georgia, serif; --dg-display-size: 1.1; }
+.pt-neko { --dg-bg: #fff5fa; --dg-surface: #ffffff; --dg-surface-2: #fff0f7; --dg-border: #f2cfe3; --dg-iron: #ffd0e8; --dg-iron-light: #b9a4ff; --dg-accent: #ff6fb5; --dg-hot: #ff9ecf; --dg-deep: #b9a4ff; --dg-ember: #8a5cff; --dg-text: #4a2a5a; --dg-muted: #8a6a9a; --dg-font-display: "Fredoka", system-ui, sans-serif; --dg-display-size: 1; }
+.pt-pirata { --dg-bg: #070b14; --dg-surface: #0f1622; --dg-surface-2: #16202e; --dg-border: #3a3020; --dg-iron: #8a5a1a; --dg-iron-light: #ffe6a8; --dg-accent: #c8862a; --dg-hot: #ffd27a; --dg-deep: #0a1a3a; --dg-ember: #e8d4a8; --dg-text: #fff6e0; --dg-muted: #c4b498; --dg-font-display: "Pirata One", Georgia, serif; --dg-display-size: 1.15; }
+.pt-tempestade { --dg-bg: #07081a; --dg-surface: #0f1128; --dg-surface-2: #151838; --dg-border: #2a2f6a; --dg-iron: #4a4f9f; --dg-iron-light: #d8dcff; --dg-accent: #4a4fbf; --dg-hot: #ffe14a; --dg-deep: #14163a; --dg-ember: #9aa0d8; --dg-text: #f0f2ff; --dg-muted: #a6aad4; --dg-font-display: "Russo One", sans-serif; --dg-display-size: .9; }
+.pt-vampiro { --dg-bg: #0b0408; --dg-surface: #150910; --dg-surface-2: #1e0e17; --dg-border: #4a1a30; --dg-iron: #4a3a4a; --dg-iron-light: #c8c0d0; --dg-accent: #a0123a; --dg-hot: #ff4a6a; --dg-deep: #2a0414; --dg-ember: #c8c0d0; --dg-text: #fbeef4; --dg-muted: #bfa2b0; --dg-font-display: "UnifrakturMaguntia", Georgia, serif; --dg-display-size: 1.1; }
+.pt-cavaleiro { --dg-bg: #070a18; --dg-surface: #0e1428; --dg-surface-2: #141c36; --dg-border: #2a3a7a; --dg-iron: #8a5a00; --dg-iron-light: #fff0a8; --dg-accent: #2a4bd0; --dg-hot: #f5c542; --dg-deep: #101a6a; --dg-ember: #ffffff; --dg-text: #f0f4ff; --dg-muted: #a8b2d4; --dg-font-display: "Cinzel Decorative", Georgia, serif; --dg-display-size: .85; }
+.pt-slime { --dg-bg: #0c0816; --dg-surface: #150f24; --dg-surface-2: #1d1530; --dg-border: #3a2a66; --dg-iron: #a86bff; --dg-iron-light: #e8d8ff; --dg-accent: #8a4dff; --dg-hot: #c8a4ff; --dg-deep: #3a1a7a; --dg-ember: #ffc23d; --dg-text: #f6f0ff; --dg-muted: #b4a6d4; --dg-font-display: "Fredoka", system-ui, sans-serif; --dg-display-size: 1; }
+.pt-floresta { --dg-bg: #050c08; --dg-surface: #0b1610; --dg-surface-2: #111f17; --dg-border: #1f4a30; --dg-iron: #2a6a2a; --dg-iron-light: #8fdc8a; --dg-accent: #1aa87a; --dg-hot: #5affc8; --dg-deep: #0a2a1a; --dg-ember: #ffd27a; --dg-text: #ecfff4; --dg-muted: #9fc4ae; --dg-font-display: "Kaushan Script", cursive; --dg-display-size: 1; }
+.pt-tricolor { --dg-bg: #08080a; --dg-surface: #141416; --dg-surface-2: #1c1c20; --dg-border: #3a1a1e; --dg-iron: #111111; --dg-iron-light: #f2c14e; --dg-accent: #e3061b; --dg-hot: #ff2a3a; --dg-deep: #5a0008; --dg-ember: #f2c14e; --dg-text: #ffffff; --dg-muted: #c9b9bb; --dg-font-display: "Russo One", Impact, sans-serif; --dg-display-size: 1; }
+.bnr-t-oni { background: #08080b url("/img/theme/oni-banner.svg") center / cover no-repeat; }
+.bnr-t-serpente { background: #08080b url("/img/theme/serpente-banner.svg") center / cover no-repeat; }
+.bnr-t-kraken { background: #08080b url("/img/theme/kraken-banner.svg") center / cover no-repeat; }
+.bnr-t-neko { background: #08080b url("/img/theme/neko-banner.svg") center / cover no-repeat; }
+.bnr-t-pirata { background: #08080b url("/img/theme/pirata-banner.svg") center / cover no-repeat; }
+.bnr-t-tempestade { background: #08080b url("/img/theme/tempestade-banner.svg") center / cover no-repeat; }
+.bnr-t-vampiro { background: #08080b url("/img/theme/vampiro-banner.svg") center / cover no-repeat; }
+.bnr-t-cavaleiro { background: #08080b url("/img/theme/cavaleiro-banner.svg") center / cover no-repeat; }
+.bnr-t-slime { background: #08080b url("/img/theme/slime-banner.svg") center / cover no-repeat; }
+.bnr-t-floresta { background: #08080b url("/img/theme/floresta-banner.svg") center / cover no-repeat; }
+.bnr-t-tricolor { background: #08080b url("/img/theme/tricolor-banner.svg") center / cover no-repeat; }
+.pt-oni, .pt-serpente, .pt-neko, .pt-cavaleiro, .pt-slime, .pt-floresta, .pt-tricolor { --dg-display-size: 1; }
+.pt-kraken, .pt-vampiro { --dg-display-size: 1.1; } .pt-pirata { --dg-display-size: 1.15; } .pt-tempestade { --dg-display-size: .9; } .pt-cavaleiro { --dg-display-size: .85; }
+.pt-neko .pt-nameplate { color: #4a2a5a; text-shadow: 0 0 8px #fff; background: linear-gradient(100deg, #fff 0%, #ffd0e8 55%, #d8c8ff 100%); }
+.pt-slime.profile-card, .pt-neko.profile-card, .pt-slime .pc-body, .pt-neko .pc-body { border-radius: 18px; }
+/* Tricolor Soberano (exclusivo do dono): borda tricolor girando, nameplate listrada com brilho, selo e títulos */
+.profile-card.pt-tricolor { border: 2px solid transparent; background: linear-gradient(var(--dg-surface), var(--dg-surface)) padding-box, linear-gradient(90deg, #e3061b, #fff, #0a0a0a, #e3061b) border-box; background-size: 100% 100%, 300% 100%; animation: triBorder 5s linear infinite, ptGlow 3.2s ease-in-out infinite; }
+@keyframes triBorder { to { background-position: 0 0, 300% 0; } }
+.pt-tricolor .pt-nameplate { position: relative; overflow: hidden; border-color: #f2c14e; text-shadow: 0 2px 0 #000, 0 0 10px #e3061b;
+  background: linear-gradient(90deg, #e3061b 0 16.6%, #fff 16.6% 33.3%, #0a0a0a 33.3% 50%, #e3061b 50% 66.6%, #fff 66.6% 83.3%, #0a0a0a 83.3%) 0 100% / 200% 5px no-repeat, linear-gradient(100deg, #2a2a2e 0%, #050505 55%, #5a0008 100%);
+  animation: triShift 4s linear infinite; }
+.pt-tricolor .pt-nameplate::after { content: ''; position: absolute; inset: 0; width: 40%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent); animation: triShine 3s ease-in-out infinite; }
+@keyframes triShift { to { background-position: 200% 100%, 0 0; } }
+@keyframes triShine { 0% { transform: translateX(-120%) skewX(-20deg); } 60%, 100% { transform: translateX(260%) skewX(-20deg); } }
+.pt-tricolor .pt-gem { background: #f2c14e; box-shadow: 0 0 10px #f2c14e; }
+.pt-owner { align-self: flex-start; margin: 2px 0 4px; padding: 3px 10px; border-radius: 4px; font: 800 11px/1.4 var(--dg-font-body); letter-spacing: .1em; text-transform: uppercase; color: #111;
+  background: linear-gradient(90deg, #fff6c8, #f2c14e, #b8862a, #fff6c8) 0 0 / 300% 100%; animation: triShift 3s linear infinite; box-shadow: 0 0 12px rgba(242,193,78,.5); }
+.pt-timeline { list-style: none; margin: 0; padding: 0 0 0 20px; position: relative; display: grid; gap: 6px; }
+.pt-timeline::before { content: ''; position: absolute; left: 5px; top: 3px; bottom: 3px; width: 3px; border-radius: 2px; background: linear-gradient(#e3061b 0 33%, #fff 33% 66%, #0a0a0a 66%); }
+.pt-timeline li { position: relative; display: flex; gap: 8px; align-items: baseline; font-size: 13.5px; }
+.pt-timeline li::before { content: '★'; position: absolute; left: -21px; color: #f2c14e; text-shadow: 0 0 8px #f2c14e; animation: ptGem 2s ease-in-out infinite; }
+.pt-timeline b { font: 400 15px/1.1 var(--dg-font-display); color: #f2c14e; min-width: 78px; }
+@media (prefers-reduced-motion: reduce) { .profile-card.pt-tricolor, .pt-tricolor .pt-nameplate, .pt-tricolor .pt-nameplate::after, .pt-owner { animation: none; } }
+
 /* moldura do kit é um pouco maior (162%) */
 .av-deco.kit { left: -31%; top: -31%; width: 162%; height: 162%; }
 

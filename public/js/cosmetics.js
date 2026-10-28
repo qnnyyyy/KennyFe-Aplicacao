@@ -17,8 +17,8 @@ export const BANNERS = [
   ['kawaii', 'Kawaii', 'geek'], ['comic', 'HQ', 'geek'], ['ocean', 'Mar pirata', 'anime'], ['galaxy', 'Galáxia', 'geek'],
   ['synthwave', 'Synthwave', 'jogos'], ['arcade', 'Arcade 8-bit', 'jogos'], ['matrix', 'Código', 'jogos'], ['blocks', 'Blocos caindo', 'jogos'],
   ['fps', 'Mira e radar', 'jogos'], ['zone', 'Zona fechando', 'jogos'], ['space', 'Velocidade da luz', 'jogos'], ['racing', 'Corrida', 'jogos'],
-  ['rubro', 'Dragão Rubro', 'jogos'], ['t-raposa', 'Raposa Espiritual', 'anime'], ['t-corvo', 'Corvo Sombrio', 'anime'], ['t-sakura', 'Lâmina Sakura', 'anime'], ['t-gamer', 'Gamer Arcade', 'jogos'], ['t-fenix', 'Fênix Solar', 'geek'], ['t-lobo', 'Lobo Lunar', 'geek'], ['t-arcano', 'Círculo Arcano', 'jogos'], ['t-cyber', 'Neon Cyber', 'jogos'], ['t-galaxia', 'Galáxia', 'geek'], ['t-caveira', 'Caveira Tóxica', 'jogos'], ['rpg', 'Floresta RPG', 'jogos'], ['cyber', 'Cidade cyberpunk', 'jogos'], ['lava', 'Lava', 'jogos'], ['craft', 'Mundo de blocos', 'jogos'],
-].map(([id, name, cat]) => ({ id, name, cat }));
+  ['rubro', 'Dragão Rubro', 'jogos'], ['t-raposa', 'Raposa Espiritual', 'anime'], ['t-corvo', 'Corvo Sombrio', 'anime'], ['t-sakura', 'Lâmina Sakura', 'anime'], ['t-gamer', 'Gamer Arcade', 'jogos'], ['t-fenix', 'Fênix Solar', 'geek'], ['t-lobo', 'Lobo Lunar', 'geek'], ['t-arcano', 'Círculo Arcano', 'jogos'], ['t-cyber', 'Neon Cyber', 'jogos'], ['t-galaxia', 'Galáxia', 'geek'], ['t-caveira', 'Caveira Tóxica', 'jogos'], ['t-oni', 'Máscara Oni', 'anime'], ['t-serpente', 'Serpente Jade', 'anime'], ['t-kraken', 'Kraken Abissal', 'geek'], ['t-neko', 'Neko Kawaii', 'anime'], ['t-pirata', 'Pirata dos Mares', 'anime'], ['t-tempestade', 'Tempestade', 'geek'], ['t-vampiro', 'Vampiro Gótico', 'geek'], ['t-cavaleiro', 'Ordem do Cavaleiro', 'jogos'], ['t-slime', 'Slime Rei', 'jogos'], ['t-floresta', 'Floresta Mística', 'geek'], ['t-tricolor', 'Tricolor Soberano', 'jogos', 'owner'], ['rpg', 'Floresta RPG', 'jogos'], ['cyber', 'Cidade cyberpunk', 'jogos'], ['lava', 'Lava', 'jogos'], ['craft', 'Mundo de blocos', 'jogos'],
+].map(([id, name, cat, owner]) => ({ id, name, cat, owner: owner === 'owner' }));
 
 export const FRAMES = [
   ['none', 'Sem moldura', 'basico'],
@@ -37,12 +37,13 @@ export const DECOS = [
   ['none', 'Nenhuma', 'basico', 'f'],
   ['x-dragon', 'Dragões Rubros', 'jogos', 'fb'], ['x-dragon-fly', 'Dragão Rubro dando a volta', 'jogos', 'fb'], ['x-dragon-east', 'Dragão oriental', 'anime', 'f'],
   ['t-raposa', 'Raposa Espiritual', 'anime', 'f', 'kit'], ['t-corvo', 'Corvo Sombrio', 'anime', 'f', 'kit'], ['t-sakura', 'Lâmina Sakura', 'anime', 'f', 'kit'], ['t-gamer', 'Gamer Arcade', 'jogos', 'f', 'kit'], ['t-fenix', 'Fênix Solar', 'geek', 'f', 'kit'], ['t-lobo', 'Lobo Lunar', 'geek', 'f', 'kit'], ['t-arcano', 'Círculo Arcano', 'jogos', 'f', 'kit'], ['t-cyber', 'Neon Cyber', 'jogos', 'f', 'kit'], ['t-galaxia', 'Galáxia', 'geek', 'f', 'kit'], ['t-caveira', 'Caveira Tóxica', 'jogos', 'f', 'kit'],
+  ['t-oni', 'Máscara Oni', 'anime', 'f', 'kit'], ['t-serpente', 'Serpente Jade', 'anime', 'f', 'kit'], ['t-kraken', 'Kraken Abissal', 'geek', 'f', 'kit'], ['t-neko', 'Neko Kawaii', 'anime', 'f', 'kit'], ['t-pirata', 'Pirata dos Mares', 'anime', 'f', 'kit'], ['t-tempestade', 'Tempestade', 'geek', 'f', 'kit'], ['t-vampiro', 'Vampiro Gótico', 'geek', 'f', 'kit'], ['t-cavaleiro', 'Ordem do Cavaleiro', 'jogos', 'f', 'kit'], ['t-slime', 'Slime Rei', 'jogos', 'f', 'kit'], ['t-floresta', 'Floresta Mística', 'geek', 'f', 'kit'], ['t-tricolor', 'Tricolor Soberano', 'jogos', 'f', 'kit', 'owner'],
   ['x-aura-water', 'Aura de água', 'anime', 'fb'], ['x-aura-fire', 'Aura de fogo', 'anime', 'fb'], ['x-aura-chakra', 'Aura de chakra', 'anime', 'fb'],
   ['x-aura-sharingan', 'Aura sharingan', 'anime', 'fb'], ['x-aura-golden', 'Aura dourada', 'anime', 'fb'], ['x-aura-nature', 'Aura da natureza', 'anime', 'fb'],
   ['x-crows', 'Bando de corvos', 'anime', 'fb'], ['x-fox9', 'Raposa de nove caudas', 'anime', 'fb'], ['x-serpent', 'Serpente sombria', 'anime', 'fb'],
   ['x-ninja', 'Kunais ninja', 'anime', 'f'], ['x-sakura', 'Galho de sakura', 'anime', 'f'],
   ['x-crown', 'Coroa', 'jogos', 'f'], ['x-angel', 'Asas de anjo', 'geek', 'b'], ['x-demon', 'Chifres e asas', 'geek', 'b'],
-].map(([id, name, cat, layers, kind]) => ({ id, name, cat, layers, kit: kind === 'kit' }));
+].map(([id, name, cat, layers, kind, owner]) => ({ id, name, cat, layers, kit: kind === 'kit', owner: owner === 'owner' }));
 export const DECO_BY_ID = Object.fromEntries(DECOS.map((d) => [d.id, d]));
 
 export const EFFECTS = [
@@ -80,5 +81,17 @@ export const THEMES = [
   { id: 'cyber', name: 'Neon Cyber', cat: 'jogos', deco: 't-cyber', banner: 'theme:t-cyber', badges: [['visor', 'Visor'], ['chip', 'Chip'], ['raio', 'Raio'], ['alvo', 'Alvo']] },
   { id: 'galaxia', name: 'Galáxia', cat: 'geek', deco: 't-galaxia', banner: 'theme:t-galaxia', badges: [['planeta', 'Planeta'], ['estrela', 'Estrela'], ['foguete', 'Foguete'], ['cometa', 'Cometa']] },
   { id: 'caveira', name: 'Caveira Tóxica', cat: 'jogos', deco: 't-caveira', banner: 'theme:t-caveira', badges: [['caveira', 'Caveira'], ['radiacao', 'Radiação'], ['gota', 'Gota tóxica'], ['osso', 'Osso']] },
+  { id: 'oni', name: 'Máscara Oni', cat: 'anime', deco: 't-oni', banner: 'theme:t-oni', badges: [['mascara', 'Máscara'], ['chifre', 'Chifre'], ['chama', 'Chama'], ['presa', 'Presa']] },
+  { id: 'serpente', name: 'Serpente Jade', cat: 'anime', deco: 't-serpente', banner: 'theme:t-serpente', badges: [['cobra', 'Cobra'], ['olho', 'Olho'], ['escama', 'Escama'], ['moeda', 'Moeda']] },
+  { id: 'kraken', name: 'Kraken Abissal', cat: 'geek', deco: 't-kraken', banner: 'theme:t-kraken', badges: [['tentaculo', 'Tentáculo'], ['olho', 'Olho'], ['ancora', 'Âncora'], ['bolha', 'Bolha']] },
+  { id: 'neko', name: 'Neko Kawaii', cat: 'anime', deco: 't-neko', banner: 'theme:t-neko', badges: [['pata', 'Pata'], ['coracao', 'Coração'], ['peixe', 'Peixinho'], ['estrela', 'Estrela']] },
+  { id: 'pirata', name: 'Pirata dos Mares', cat: 'anime', deco: 't-pirata', banner: 'theme:t-pirata', badges: [['mapa', 'Mapa do tesouro'], ['bussola', 'Bússola'], ['leme', 'Leme'], ['ancora', 'Âncora']] },
+  { id: 'tempestade', name: 'Tempestade', cat: 'geek', deco: 't-tempestade', banner: 'theme:t-tempestade', badges: [['raio', 'Raio'], ['nuvem', 'Nuvem'], ['chuva', 'Chuva'], ['vento', 'Vento']] },
+  { id: 'vampiro', name: 'Vampiro Gótico', cat: 'geek', deco: 't-vampiro', banner: 'theme:t-vampiro', badges: [['presas', 'Presas'], ['morcego', 'Morcego'], ['rosa', 'Rosa'], ['lua', 'Lua']] },
+  { id: 'cavaleiro', name: 'Ordem do Cavaleiro', cat: 'jogos', deco: 't-cavaleiro', banner: 'theme:t-cavaleiro', badges: [['espada', 'Espada'], ['escudo', 'Escudo'], ['elmo', 'Elmo'], ['coroa', 'Coroa']] },
+  { id: 'slime', name: 'Slime Rei', cat: 'jogos', deco: 't-slime', banner: 'theme:t-slime', badges: [['slime', 'Slime'], ['coroa', 'Coroa'], ['gema', 'Gema'], ['gota', 'Gota']] },
+  { id: 'floresta', name: 'Floresta Mística', cat: 'geek', deco: 't-floresta', banner: 'theme:t-floresta', badges: [['folha', 'Folha'], ['cogumelo', 'Cogumelo'], ['vagalume', 'Vagalume'], ['flor', 'Flor']] },
+  // exclusivo da conta do dono
+  { id: 'tricolor', name: 'Tricolor Soberano', cat: 'jogos', owner: true, deco: 't-tricolor', banner: 'theme:t-tricolor', badges: [['mundial', 'Tri Mundial (92, 93 e 05)'], ['taca', 'Libertadores'], ['tri-brasileiro', 'Tri Brasileiro (06, 07, 08)'], ['1930', 'Desde 1930'], ['bola', 'Bola tricolor'], ['coracao', 'Coração tricolor']] },
 ];
 export const THEME_BY_ID = Object.fromEntries(THEMES.map((t) => [t.id, t]));

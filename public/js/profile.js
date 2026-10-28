@@ -13,7 +13,7 @@ let themeFonts = false;
 function loadThemeFonts() {
   if (themeFonts) return;
   themeFonts = true;
-  document.head.append(el('link', { rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=Alegreya+Sans:wght@400;500;700&family=Press+Start+2P&family=Shippori+Mincho:wght@700;800&family=Orbitron:wght@700;900&family=Creepster&family=Audiowide&family=Uncial+Antiqua&display=swap' }));
+  document.head.append(el('link', { rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=Alegreya+Sans:wght@400;500;700&family=Press+Start+2P&family=Shippori+Mincho:wght@700;800&family=Orbitron:wght@700;900&family=Creepster&family=Audiowide&family=Uncial+Antiqua&family=Pirata+One&family=Fredoka:wght@500;700&family=UnifrakturMaguntia&family=Cinzel+Decorative:wght@700;900&family=Russo+One&family=Kaushan+Script&display=swap' }));
 }
 
 export function profileCard(app, user, { preview = false } = {}) {
@@ -35,6 +35,7 @@ export function profileCard(app, user, { preview = false } = {}) {
     ),
     el('div', { class: 'pc-body' },
       name,
+      theme?.owner ? el('div', { class: 'pt-owner' }, '👑 Dono do Kenfeh · Exclusivo') : null,
       el('div', { class: 'pc-user' }, '@' + (user.username || 'voce')),
       user.statusText ? el('div', { class: 'pc-status', 'data-pf': 'status' }, user.statusText) : null,
       act
@@ -43,6 +44,10 @@ export function profileCard(app, user, { preview = false } = {}) {
             el('div', {}, el('small', {}, 'JOGANDO AGORA'), el('b', {}, user.activity.name), el('small', { class: 'muted' }, timeAgo(user.activity.since))))
         : null,
       user.bio ? el('div', { class: 'pc-section' }, el('h5', {}, 'Sobre mim'), el('p', { 'data-pf': 'bio' }, user.bio)) : null,
+      theme?.id === 'tricolor'
+        ? el('div', { class: 'pc-section' }, el('h5', {}, 'Títulos'), el('ol', { class: 'pt-timeline' },
+            [['1930', 'Fundação'], ['92 · 93 · 05', 'Tri Mundial'], ['06 · 07 · 08', 'Tri Brasileiro seguido'], ['2023', 'Copa do Brasil']].map(([y, t]) => el('li', {}, el('b', {}, y), el('span', {}, t)))))
+        : null,
       user.favoriteGames?.length
         ? el('div', { class: 'pc-section' }, el('h5', {}, 'Jogos favoritos'), el('div', { class: 'chips' }, user.favoriteGames.map((g) => el('span', { class: 'chip game-chip' }, `${gameEmoji(g)} ${g}`))))
         : null

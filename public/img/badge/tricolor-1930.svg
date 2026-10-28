@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><style>.ki{transform-origin:32px 33px;animation:ki 2.4s ease-in-out infinite}@keyframes ki{50%{transform:scale(1.08)}}</style><style>
+@keyframes spin { to { transform: rotate(360deg) } }
+@keyframes spinr { to { transform: rotate(-360deg) } }
+@keyframes pulse { 0%,100% { opacity: .55 } 50% { opacity: 1 } }
+@keyframes twinkle { 0%,100% { transform: scale(1); filter: brightness(1) } 50% { transform: scale(1.25); filter: brightness(1.5) } }
+@keyframes bob { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-14px) } }
+@keyframes fall { 0% { transform: translateY(0) rotate(0) ; opacity: 0 } 10% { opacity: 1 } 100% { transform: translateY(var(--dy)) rotate(var(--sp)); opacity: .9 } }
+@keyframes burst { 0% { transform: scale(.1); opacity: 0 } 15% { opacity: 1 } 70% { opacity: .9 } 100% { transform: scale(1); opacity: 0 } }
+@keyframes sweep { 0% { transform: translateX(-120%) } 60%,100% { transform: translateX(220%) } }
+@keyframes beam { 0%,100% { opacity: .25 } 50% { opacity: .6 } }
+@keyframes march { to { transform: translateX(var(--mx)) } }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important } }
+</style><defs><radialGradient id="bgballg" cx=".35" cy=".3"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#d8d8d8"/></radialGradient>
+<radialGradient id="bgshade" cx=".35" cy=".3" r=".8"><stop offset=".5" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".45"/></radialGradient>
+<linearGradient id="bggold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff6c8"/><stop offset=".45" stop-color="#f2c14e"/><stop offset="1" stop-color="#8a5a00"/></linearGradient>
+<filter id="bgglow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<filter id="bgsoft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="18"/></filter><clipPath id="bgcl"><path d="M32,3 L58,13 V32 C58,46 46,56 32,61 C18,56 6,46 6,32 V13 Z"/></clipPath></defs><g clip-path="url(#bgcl)"><rect width="22" height="64" fill="#e3061b"/><rect x="21" width="22" height="64" fill="#ffffff"/><rect x="42" width="22" height="64" fill="#0a0a0a"/><rect x="-30" width="20" height="64" fill="#fff" opacity=".45" transform="skewX(-20)" style="animation:sweep 3s ease-in-out infinite"/></g><path d="M32,3 L58,13 V32 C58,46 46,56 32,61 C18,56 6,46 6,32 V13 Z" fill="none" stroke="url(#bggold)" stroke-width="3.5"/><g filter="url(#bgglow)"><text x="32" y="40" text-anchor="middle" font-family="Impact, 'Arial Black', 'Helvetica Neue', sans-serif" font-size="19" fill="url(#bggold)" stroke="#000" stroke-width="3" paint-order="stroke">1930</text></g><clipPath id="kc"><path d="M32,3 L58,13 V32 C58,46 46,56 32,61 C18,56 6,46 6,32 V13 Z"/></clipPath><g clip-path="url(#kc)"><rect x="-30" y="0" width="12" height="64" fill="#fff" opacity=".3" transform="skewX(-20)"><animate attributeName="x" values="-30;90;90" keyTimes="0;.35;1" dur="4s" repeatCount="indefinite"/></rect></g></svg>
