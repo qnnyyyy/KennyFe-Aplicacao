@@ -1,6 +1,9 @@
 // KenBeat 🎧 no navegador: toca o player do YouTube no mesmo ponto para todo mundo da call
 // e mostra o bloco do bot no palco (capa, barra de progresso, fila e controles).
-import { el, icon, toast, store, save, bgInterval } from './ui.js';
+import { el, icon, toast, store, save, bgInterval, contextMenu } from './ui.js';
+
+// iPhone/iPad: o navegador não deixa site mudar o volume (só o botão do aparelho); dá para silenciar
+const IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 import { can } from './guild.js';
 
 const fmt = (s) => {
@@ -36,6 +39,7 @@ export class MusicClient {
     this.states = new Map(); // canal de voz -> estado
     this.offset = 0; // relógio do servidor - relógio local
     this.volume = store('music-volume', 60);
+    this.muted = store('music-muted', false);
     this.player = null;
     this.playerVideo = null;
     this.host = el('div', { class: 'yt-host' }, el('div', { id: 'yt-player' }));
@@ -72,16 +76,77 @@ export class MusicClient {
     this.sync();
   }
 
+  // volume do KenBeat é só seu (cada um ouve pelo próprio navegador)
   setVolume(v) {
-    this.volume = Math.max(0, Math.min(100, Math.round(v)));
+    this.volume = Math.max(0, Math.min(100, Math.round(Number(v) || 0)));
     save('music-volume', this.volume);
+    if (this.volume > 0 && this.muted) this.setMuted(false);
     this.applyVolume();
+    this.updateVolUI();
+  }
+
+  setMuted(m) {
+    this.muted = Boolean(m);
+    save('music-muted', this.muted);
+    this.applyVolume();
+    this.updateVolUI();
+  }
+
+  get silent() {
+    return this.muted || this.volume === 0 || this.app.call.deafened;
   }
 
   applyVolume() {
+    const p = this.player;
+    if (!p || !this.ready) return;
     try {
-      this.player?.setVolume?.(this.app.call.deafened ? 0 : this.volume);
+      if (this.silent) p.mute();
+      else {
+        p.unMute();
+        p.setVolume(this.volume);
+      }
     } catch {}
+  }
+
+  // atualiza os controles de volume que estiverem na tela (bloco do bot e menus)
+  updateVolUI() {
+    for (const n of document.querySelectorAll('[data-music-vol]')) if (document.activeElement !== n) n.value = this.volume;
+    for (const n of document.querySelectorAll('[data-music-vol-label]')) n.textContent = this.silent ? 'mudo' : this.volume + '%';
+    for (const n of document.querySelectorAll('[data-music-mute]')) {
+      n.replaceChildren(icon(this.silent ? 'volume-x' : 'volume', 18));
+      n.classList.toggle('on', this.silent);
+      n.title = this.muted ? 'Tirar do mudo' : 'Silenciar o KenBeat (só para você)';
+    }
+  }
+
+  // controle de volume pronto para colocar em qualquer lugar
+  volControl() {
+    const mute = el('button', { class: 'mb-btn', dataset: { musicMute: '1' }, onclick: (e) => { e.stopPropagation(); this.setMuted(!this.muted); } });
+    const range = IOS ? null : el('input', { type: 'range', min: 0, max: 100, step: 1, value: this.volume, class: 'mb-range', dataset: { musicVol: '1' }, title: 'Volume do KenBeat (só para você)', oninput: (e) => this.setVolume(e.target.value), onpointerdown: (e) => e.stopPropagation(), ondblclick: (e) => e.stopPropagation() });
+    const label = el('small', { class: 'mb-vol-label', dataset: { musicVolLabel: '1' } });
+    const box = el('div', { class: 'mb-vol', title: IOS ? 'No iPhone/iPad o volume é o do aparelho; aqui dá para silenciar' : '' }, mute, range, label, IOS ? el('small', { class: 'mb-ios' }, 'use o volume do aparelho') : null);
+    setTimeout(() => this.updateVolUI(), 0);
+    return box;
+  }
+
+  // menu do bot (clique direito no bloco ou na lista do canal de voz)
+  menuItems(channelId = this.app.call.channelId) {
+    const st = this.stateOf(channelId);
+    const here = this.app.call.active && this.app.call.channelId === channelId;
+    const items = [{ type: 'title', label: '🎧 KenBeat' + (st?.current ? ' — ' + st.current.title.slice(0, 40) : '') }];
+    if (!IOS) items.push({ type: 'slider', label: '🔊 Volume do KenBeat (só para você)', min: 0, max: 100, value: this.volume, format: (v) => v + '%', onInput: (v) => this.setVolume(v) });
+    items.push({ label: this.muted ? 'Tirar do mudo' : 'Silenciar o KenBeat', icon: this.muted ? 'volume' : 'volume-x', onClick: () => this.setMuted(!this.muted) });
+    if (st?.current && here) {
+      items.push({ type: 'sep' },
+        { label: st.pausedAt ? 'Continuar' : 'Pausar (para todos)', icon: st.pausedAt ? 'play' : 'pause', onClick: () => this.control('toggle') },
+        { label: 'Pular música', icon: 'skip', onClick: () => this.control('skip') },
+        { label: 'Parar e tirar o bot', icon: 'stop', danger: true, onClick: () => this.control('stop') });
+    } else if (st?.current) items.push({ label: 'Entre na call para ouvir e controlar', disabled: true });
+    return items;
+  }
+
+  openMenu(x, y, channelId) {
+    contextMenu(x, y, this.menuItems(channelId));
   }
 
   // ---------------- player ----------------
@@ -187,6 +252,7 @@ export class MusicClient {
     const st = this.mine();
     if (!st?.current) return;
     this.applyVolume();
+    this.updateVolUI();
     if (Math.floor(Date.now() / 1000) % 4 === 0) this.align();
     // barra de progresso do bloco
     const t = this.app.call.stage.tiles.get('bot:music');
@@ -218,13 +284,7 @@ export class MusicClient {
       peerId: 'bot',
       name: `🎧 KenBeat — ${st.current.title}`,
       render: (box) => this.renderTile(box),
-      menuItems: () => [
-        { type: 'slider', label: '🎧 Volume do KenBeat (só para você)', min: 0, max: 100, value: this.volume, format: (v) => v + '%', onInput: (v) => this.setVolume(v) },
-        { label: st.pausedAt ? 'Continuar' : 'Pausar', icon: st.pausedAt ? 'play' : 'pause', onClick: () => this.control('toggle') },
-        { label: 'Pular música', icon: 'skip', onClick: () => this.control('skip') },
-        { label: 'Parar e tirar o bot', icon: 'stop', danger: true, onClick: () => this.control('stop') },
-        { type: 'sep' },
-      ],
+      menuItems: () => [...this.menuItems().slice(1), { type: 'sep' }],
     };
   }
 
@@ -255,6 +315,7 @@ export class MusicClient {
           bar,
           el('div', { class: 'mb-row' },
             el('span', { class: 'mb-time' }, ''),
+            this.volControl(),
             el('div', { class: 'mb-ctl' },
               b('shuffle', 'Embaralhar fila', 'shuffle'),
               b(st.pausedAt ? 'play' : 'pause', st.pausedAt ? 'Continuar' : 'Pausar', 'toggle'),

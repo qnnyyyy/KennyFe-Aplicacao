@@ -256,7 +256,7 @@ export class CallController {
     try {
       const g = this.app.group(this.groupId);
       const ch = this.app.channel(this.channelId);
-      ms.metadata = this.active ? new MediaMetadata({ title: g?.isDm ? `Call com ${this.app.groupTitle(g)}` : `${ch?.name || 'Call'} • ${g?.name || ''}`, artist: 'Kenfeh', artwork: [{ src: '/img/logo.svg', sizes: '512x512', type: 'image/svg+xml' }] }) : null;
+      ms.metadata = this.active ? new MediaMetadata({ title: g?.isDm ? `Call com ${this.app.groupTitle(g)}` : `${ch?.name || 'Call'} • ${g?.name || ''}`, artist: 'Kenfeh', artwork: [{ src: '/img/kenfeh-mark.svg', sizes: '512x512', type: 'image/svg+xml' }] }) : null;
       ms.playbackState = this.active ? 'playing' : 'none';
       const set = (a, fn) => {
         try {

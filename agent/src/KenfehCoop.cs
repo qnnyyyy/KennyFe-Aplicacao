@@ -686,11 +686,19 @@ namespace KenfehCoop
         static readonly Color Text1 = Color.FromArgb(238, 241, 251);
         static readonly Color Text2 = Color.FromArgb(150, 158, 186);
         static readonly Color Blue = Color.FromArgb(61, 139, 255);
-        static readonly Color Pink = Color.FromArgb(255, 79, 163);
+        static readonly Color Pink = Color.FromArgb(255, 61, 154);
         static readonly Color Green = Color.FromArgb(61, 220, 151);
         static readonly Color Yellow = Color.FromArgb(255, 204, 77);
         static readonly Color Red = Color.FromArgb(255, 77, 109);
         static readonly Color[] PlayerColors = { Blue, Pink, Green, Yellow, Color.FromArgb(160, 120, 255) };
+
+        // logo do Kenfeh (PNG embutido, nítido em qualquer escala)
+        static Image Mark = LoadMark();
+        static Image LoadMark()
+        {
+            try { using (Stream st = Assembly.GetExecutingAssembly().GetManifestResourceStream("kenfeh-mark.png")) return st == null ? null : new Bitmap(st); }
+            catch { return null; }
+        }
 
         Label codeLbl, siteDot, siteLbl, padDot, padLbl, gameLbl, logLbl;
         Label[] pName = new Label[5], pStatus = new Label[5];
@@ -716,11 +724,12 @@ namespace KenfehCoop
             header.Paint += (s, e) =>
             {
                 Graphics g = e.Graphics;
-                using (LinearGradientBrush br = new LinearGradientBrush(header.ClientRectangle, Color.FromArgb(47, 123, 255), Pink, 0f)) g.FillRectangle(br, header.ClientRectangle);
+                using (LinearGradientBrush br = new LinearGradientBrush(header.ClientRectangle, Color.FromArgb(255, 61, 154), Color.FromArgb(61, 123, 255), 0f)) g.FillRectangle(br, header.ClientRectangle);
                 g.SmoothingMode = SmoothingMode.AntiAlias;
                 g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
-                using (GraphicsPath gp = RoundPanel.Path(new Rectangle(22, 20, 52, 52), 14)) using (SolidBrush b = new SolidBrush(Color.FromArgb(60, 255, 255, 255))) g.FillPath(b, gp);
-                using (Font f = new Font("Segoe UI Emoji", 22f)) g.DrawString("🎮", f, Brushes.White, 26, 25);
+                g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                if (Mark != null) g.DrawImage(Mark, new Rectangle(22, 20, 52, 52));
+                else using (Font f = new Font("Segoe UI Emoji", 22f)) g.DrawString("🎮", f, Brushes.White, 26, 25);
                 using (Font f = new Font("Segoe UI", 19f, FontStyle.Bold)) g.DrawString("Kenfeh Coop", f, Brushes.White, 86, 16);
                 using (Font f = new Font("Segoe UI", 9.5f)) g.DrawString("Seus amigos jogam no seu PC como jogadores separados", f, Brushes.White, 89, 52);
                 using (Font f = new Font("Segoe UI", 8f, FontStyle.Bold)) g.DrawString("v" + Agent.Version, f, Brushes.White, 452, 8);
@@ -733,7 +742,7 @@ namespace KenfehCoop
             codeLbl = MakeLabel("", 16, 58, 240, Text1, 30f, FontStyle.Bold);
             codeLbl.Height = 56;
             c1.Controls.Add(codeLbl);
-            Button copy = MakeButton("Copiar", 262, 68, 92, Blue);
+            Button copy = MakeButton("Copiar", 262, 68, 92, Pink);
             copy.Click += (s, e) => { try { Clipboard.SetText(Agent.PairCode); copy.Text = "Copiado ✓"; } catch { } };
             c1.Controls.Add(copy);
             Button renew = MakeButton("Novo código", 360, 68, 92, Card2);

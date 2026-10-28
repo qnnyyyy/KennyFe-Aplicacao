@@ -100,16 +100,18 @@ async function main() {
   const html = fs
     .readFileSync(path.join(PUBLIC_DIR, 'index.html'), 'utf8')
     .replace('href="/css/app.css"', `href="/v/${BUILD}/css/app.css"`)
-    .replace('src="/js/main.js"', `src="/v/${BUILD}/js/main.js"`);
+    .replace('src="/js/main.js"', `src="/v/${BUILD}/js/main.js"`)
+    .replaceAll('"/img/', `"/v/${BUILD}/img/`); // imagens também mudam de endereço a cada versão (a Cloudflare guardava o logo antigo)
   const sendIndex = (_req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.type('html').send(html);
   };
   app.get(['/', '/index.html'], sendIndex);
   // página pública de download do Kenfeh Coop
+  const coopHtml = fs.readFileSync(path.join(PUBLIC_DIR, 'coop.html'), 'utf8').replaceAll('"/img/', `"/v/${BUILD}/img/`);
   app.get(['/coop', '/coop/'], (_req, res) => {
-    res.setHeader('Cache-Control', 'no-cache');
-    res.sendFile(path.join(PUBLIC_DIR, 'coop.html'));
+    res.setHeader('Cache-Control', 'no-store');
+    res.type('html').send(coopHtml);
   });
   app.use(express.static(PUBLIC_DIR, { index: false, maxAge: 0 }));
   app.get('*', sendIndex);

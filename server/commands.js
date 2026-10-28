@@ -20,7 +20,7 @@ const COMMANDS = [
   { name: 'embaralhar', aliases: ['shuffle'], desc: 'Embaralha a fila', perm: 'music', group: 'Música' },
   { name: 'repetir', aliases: ['loop'], args: '[musica | fila | off]', desc: 'Repete a música ou a fila', perm: 'music', group: 'Música' },
   { name: 'remover', aliases: ['remove'], args: '<número na fila>', desc: 'Tira uma música da fila', perm: 'music', group: 'Música' },
-  { name: 'volume', aliases: ['vol'], args: '<0-100>', desc: 'Volume da música só para você', group: 'Música', client: true },
+  { name: 'volume', aliases: ['vol'], args: '<0-100 | +10 | -10 | mudo | on>', desc: 'Volume do KenBeat só para você', group: 'Música', client: true },
 
   { name: 'enquete', aliases: ['poll', 'votacao'], args: '<pergunta> | <opção 1> | <opção 2> …', desc: 'Cria uma votação (até 10 opções)', group: 'Diversão' },
   { name: 'dado', aliases: ['roll', 'd'], args: '[2d6]', desc: 'Rola dados (padrão 1d6)', group: 'Diversão' },

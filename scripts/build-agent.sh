@@ -15,5 +15,5 @@ mcs -target:winexe -langversion:5 -optimize+ -nostdlib -noconfig \
   -r:$REF/mscorlib.dll -r:$REF/System.dll -r:$REF/System.Core.dll -r:$REF/System.Windows.Forms.dll -r:$REF/System.Drawing.dll \
   -r:$REF/System.IO.Compression.dll -r:$REF/System.IO.Compression.FileSystem.dll \
   -win32icon:agent/src/kenfeh.ico \
-  -resource:agent/vendor/Nefarius.ViGEm.Client.dll,ViGEmClient.dll -resource:agent/vendor/ViGEmBus_Setup.exe,ViGEmBusSetup.exe -out:agent/dist/KenfehCoop.exe agent/src/KenfehCoop.cs
+  -resource:agent/src/kenfeh-mark.png,kenfeh-mark.png -resource:agent/vendor/Nefarius.ViGEm.Client.dll,ViGEmClient.dll -resource:agent/vendor/ViGEmBus_Setup.exe,ViGEmBusSetup.exe -out:agent/dist/KenfehCoop.exe agent/src/KenfehCoop.cs
 echo "OK: agent/dist/KenfehCoop.exe"

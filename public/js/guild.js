@@ -112,10 +112,12 @@ export function renderChannels(app, box, { selectChannel, joinVoice, userMenu, o
       return ur;
     });
     if (music?.current) {
-      users.push(el('div', { class: 'voice-user bot', title: music.current.title, onclick: (e) => e.stopPropagation() },
+      const botRow = el('div', { class: 'voice-user bot', title: `${music.current.title} — clique para volume e controles`, onclick: (e) => { e.stopPropagation(); app.music.openMenu(e.clientX, e.clientY, c.id); } },
         el('span', { class: 'bot-av' }, '🎧'),
         el('span', { class: 'vu-name' }, el('b', {}, 'KenBeat '), el('small', {}, music.pausedAt ? '⏸ ' : '♪ ', music.current.title)),
-        music.pausedAt ? null : el('span', { class: 'eq' }, el('i'), el('i'), el('i'))));
+        app.music.muted ? el('span', { class: 'vu-icons', title: 'KenBeat no mudo (só para você)' }, icon('volume-x', 13)) : music.pausedAt ? null : el('span', { class: 'eq' }, el('i'), el('i'), el('i')));
+      onContext(botRow, (x, y) => app.music.openMenu(x, y, c.id));
+      users.push(botRow);
     }
     return el('div', { class: 'voice-block' }, row, users.length ? el('div', { class: 'voice-users' }, users) : null);
   };

@@ -126,12 +126,22 @@ export class Commands {
       return true;
     }
     if (c?.name === 'volume') {
-      const v = Number(args);
-      if (!(v >= 0 && v <= 100)) chat.local(`Volume atual do KenBeat: **${this.app.music.volume}%**. Use /volume 0-100.`, { title: 'KenBeat', icon: '🎧' });
-      else {
-        this.app.music.setVolume(v);
-        chat.local(`🔊 Volume do KenBeat em **${v}%** (só para você).`, { title: 'KenBeat', icon: '🎧' });
-      }
+      const music = this.app.music;
+      const a = args.toLowerCase().replace('%', '').trim();
+      const kb = { title: 'KenBeat', icon: '🎧' };
+      if (['mudo', 'mute', 'off', 'silenciar'].includes(a)) {
+        music.setMuted(true);
+        chat.local('🔇 KenBeat no mudo (só para você). /volume on volta.', kb);
+      } else if (['on', 'desmutar', 'unmute', 'som'].includes(a)) {
+        music.setMuted(false);
+        chat.local(`🔊 KenBeat de volta em **${music.volume}%**.`, kb);
+      } else if (/^[+-]\d+$/.test(a)) {
+        music.setVolume(music.volume + Number(a));
+        chat.local(`🔊 Volume do KenBeat em **${music.volume}%** (só para você).`, kb);
+      } else if (a !== '' && Number(a) >= 0 && Number(a) <= 100) {
+        music.setVolume(Number(a));
+        chat.local(`🔊 Volume do KenBeat em **${music.volume}%** (só para você).`, kb);
+      } else chat.local(`Volume do KenBeat: **${music.silent ? 'mudo' : music.volume + '%'}**. Use /volume 0-100, /volume +10, /volume -10 ou /volume mudo. Também dá no bloco do bot na call ou clicando no KenBeat na lista do canal.`, kb);
       return true;
     }
     const isMusic = c?.group === 'Música';
