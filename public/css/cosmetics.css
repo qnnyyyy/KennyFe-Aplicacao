@@ -245,3 +245,11 @@
 .bnr-rpg::before { background: radial-gradient(circle, #ffd54f 0 2px, transparent 3.5px) 0 0 / 46px 36px, radial-gradient(circle, #b2ff59 0 1.5px, transparent 3px) 23px 18px / 58px 48px; }
 .bnr-magic::before { width: 120px; height: 120px; margin: -60px 0 0 -60px; }
 .bnr-zone::before { inset: -40%; }
+/* recorte de imagem */
+.crop-modal { width: min(620px, 100%); }
+.crop { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.crop > p { align-self: stretch; margin: 0; }
+.crop-stage { border-radius: 14px; overflow: hidden; box-shadow: 0 0 0 1px var(--line-2); touch-action: none; }
+.crop-canvas { display: block; cursor: grab; touch-action: none; }
+.crop-canvas:active { cursor: grabbing; }
+.crop-zoom-row { display: flex; align-items: center; gap: 10px; width: min(360px, 100%); color: var(--text-2); font-weight: 800; }

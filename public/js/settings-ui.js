@@ -7,6 +7,7 @@ import { settings, updateSettings, CAMERA_PRESETS, SCREEN_RESOLUTIONS } from './
 import { listDevices, cleanLabel } from './call/media.js';
 import { keyLabel } from './call/sounds.js';
 import { AVATARS, BANNERS, COS_CATS } from './cosmetics.js';
+import { cropImage } from './cropper.js';
 
 const PROFILE_COLORS = ['#ff4fa3', '#f72585', '#ff6b6b', '#ffb84c', '#5ce1a0', '#38d6ff', '#3d8bff', '#7b5cff'];
 const BANNER_COLORS = ['#2f7bff', '#7b5cff', '#ff4fa3', '#0f172a', '#14b8a6', '#f97316', '#e11d48', '#22c55e'];
@@ -66,14 +67,21 @@ function accountPane(app) {
   const renderPreview = () => preview.replaceChildren(profileCard(app, current(), { preview: true }));
   [name, status, bio].forEach((i) => i.addEventListener('input', renderPreview));
 
-  const upload = (purpose, onDone) => {
-    const input = el('input', { type: 'file', accept: 'image/*' });
+  // escolhe a imagem, recorta (círculo para foto, faixa para fundo) e envia
+  const upload = (purpose, onDone, kind = 'avatar') => {
+    const input = el('input', { type: 'file', accept: 'image/png,image/jpeg,image/webp,image/gif' });
     input.addEventListener('change', async () => {
-      const f = input.files[0];
+      const picked = input.files[0];
+      if (!picked) return;
+      const f = await cropImage(picked, kind);
       if (!f) return;
       try {
         onDone((await api.upload(f, purpose)).url);
+        avatarsG.paint();
+        bannersG.paint();
+        paintFrames();
         renderPreview();
+        toast(kind === 'banner' ? 'Fundo pronto! Clique em "Salvar perfil".' : 'Foto pronta! Clique em "Salvar perfil".', 'success');
       } catch (err) {
         toast(err.message, 'error');
       }
@@ -176,7 +184,7 @@ function accountPane(app) {
           el('div', { class: 'row-actions' },
             el('button', { class: 'btn btn-ghost btn-sm', onclick: () => upload('avatar', (u) => (draft.avatarUrl = u)) }, '📷 Trocar foto'),
             el('button', { class: 'btn btn-ghost btn-sm', onclick: () => { draft.avatarUrl = null; avatarsG.paint(); paintFrames(); renderPreview(); } }, 'Remover foto'),
-            el('button', { class: 'btn btn-ghost btn-sm', onclick: () => upload('avatar', (u) => (draft.bannerUrl = u)) }, '🖼️ Imagem do banner'),
+            el('button', { class: 'btn btn-ghost btn-sm', onclick: () => upload('avatar', (u) => (draft.bannerUrl = u), 'banner') }, '🖼️ Imagem do banner'),
             el('button', { class: 'btn btn-ghost btn-sm', onclick: () => { draft.bannerUrl = null; bannersG.paint(); renderPreview(); } }, 'Tirar banner')
           ),
           el('label', { class: 'field' }, el('span', {}, 'Nome de exibição'), name),
