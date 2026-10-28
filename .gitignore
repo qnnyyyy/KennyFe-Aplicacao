@@ -3,3 +3,4 @@ data/
 .env
 *.log
 !.env.example
+agent/.refs/
