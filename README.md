@@ -1,6 +1,6 @@
-# 💞 KennyFe
+# ⚡ Kenfeh
 
-Nosso cantinho pra assistir, jogar e conversar juntinhos: chamadas de voz e vídeo em alta qualidade, compartilhamento de várias telas ao mesmo tempo (com áudio), chat com emojis, figurinhas e GIFs feitos no próprio site.
+Calls, telas e figurinhas com a galera: chamadas de voz e vídeo em alta qualidade, compartilhamento de várias telas ao mesmo tempo (com áudio), chat com emojis, figurinhas e GIFs feitos no próprio site.
 
 ## Como rodar
 
@@ -16,7 +16,11 @@ Abra `http://localhost:3000`, crie sua conta, crie um grupo e passe o **código 
 
 > Use **Chrome ou Edge** atualizados no PC: são os navegadores com o melhor suporte a captura de tela com áudio.
 
-### Acessando de outro PC / celular
+### Colocar no ar com o domínio
+
+Passo a passo completo (Cloudflare Tunnel + kenfeh.shop + TURN grátis) em **[HOSPEDAR.md](HOSPEDAR.md)**. As configurações ficam no arquivo `.env` (copie de `.env.example`).
+
+### Acessando de outro PC / celular (sem domínio)
 
 O navegador só libera câmera, microfone e tela em `localhost` ou em **HTTPS**. Opções:
 
@@ -34,7 +38,9 @@ A conexão de vídeo é direta entre os PCs (WebRTC). Na maioria das redes funci
 TURN_URL=turn:seu-servidor:3478 TURN_USERNAME=usuario TURN_PASSWORD=senha npm start
 ```
 
-Outras variáveis: `PORT` (padrão 3000), `DATA_DIR` (onde ficam banco e uploads, padrão `./data`).
+Ou use o TURN grátis da Cloudflare com `CF_TURN_KEY_ID` e `CF_TURN_API_TOKEN` (veja o HOSPEDAR.md).
+
+Outras variáveis: `PORT` (padrão 3000), `DATA_DIR` (onde ficam banco e uploads, padrão `./data`), `REGISTER_CODE` (exige um código para criar conta).
 
 ## O que tem
 
@@ -45,7 +51,7 @@ Outras variáveis: `PORT` (padrão 3000), `DATA_DIR` (onde ficam banco e uploads
 - **Mixer de transmissão (🎚️):** escolha exatamente quais áudios vão pra call, cada um com o nome que o PC usa — `Microfone (Realtek)`, `Headset HyperX`, `Tela 1 — áudio da janela`, `CABLE Output (VB-Audio)`… Liga/desliga e volume separado por faixa, vários microfones ao mesmo tempo.
 - **Anti-eco:** ao compartilhar o áudio do sistema, o som da própria call não é capturado (navegadores recentes), então a voz da pessoa não volta em eco.
 - **Botão direito (ou segurar o dedo no celular)** em qualquer pessoa ou bloco: volume do usuário 0–200%, volume da transmissão, silenciar pra mim, focar, 50/50, 70/30, flutuar, tela cheia, janela separada, Picture-in-Picture, estatísticas (resolução/fps/bitrate/ping).
-- **Layout ajustável:** arraste as divisórias entre os blocos pra deixar o filme grande e a webcam dela pequena (ou 50/50). Lado a lado, empilhado, foco ou grade. **Flutuar** deixa a webcam por cima do filme, arrastável e redimensionável. Arraste o nome de um bloco em cima de outro pra trocar de lugar. Tudo fica salvo.
+- **Layout ajustável:** arraste as divisórias entre os blocos pra deixar o filme grande e a webcam pequena (ou 50/50). Lado a lado, empilhado, foco ou grade. **Flutuar** deixa a webcam por cima do filme, arrastável e redimensionável. Arraste o nome de um bloco em cima de outro pra trocar de lugar. Tudo fica salvo.
 - **Tela cheia de verdade:** sem barras nem bordas — só os vídeos. Os controles somem sozinhos quando o mouse para. Duplo clique num bloco = tela cheia só dele. Também tem o **modo cinema** (esconde as barras sem sair da janela).
 - Supressão de ruído, cancelamento de eco, ganho automático, **modo alta fidelidade** (áudio cru estéreo), noise gate com medidor, escolha de microfone/câmera/alto-falante, atalhos (Ctrl+Shift+M muta, Ctrl+Shift+D ensurdece, F tela cheia).
 
@@ -63,7 +69,7 @@ Outras variáveis: `PORT` (padrão 3000), `DATA_DIR` (onde ficam banco e uploads
 
 ## Limitações honestas (do navegador, não do site)
 
-- **Áudio de um app específico (ex.: só o Valorant):** o Chrome/Edge mais novos capturam só o áudio da *janela* escolhida. Se o seu não oferecer, use um cabo virtual ([VB-CABLE](https://vb-audio.com/Cable/)): no Windows, *Configurações → Sistema → Som → Mixer de volume*, mande o Valorant para "CABLE Input" e adicione "CABLE Output" como fonte no Mixer do KennyFe. Assim você escolhe faixa por faixa o que vai.
+- **Áudio de um app específico (ex.: só o Valorant):** o Chrome/Edge mais novos capturam só o áudio da *janela* escolhida. Se o seu não oferecer, use um cabo virtual ([VB-CABLE](https://vb-audio.com/Cable/)): no Windows, *Configurações → Sistema → Som → Mixer de volume*, mande o Valorant para "CABLE Input" e adicione "CABLE Output" como fonte no Mixer do Kenfeh. Assim você escolhe faixa por faixa o que vai.
 - **Netflix/Prime/Disney ficando pretos:** é a proteção DRM. No Chrome/Edge, desative *Configurações → Sistema → Usar aceleração de hardware* e reinicie o navegador.
 - **Muita gente com vídeo:** as conexões são diretas entre cada par de pessoas (sem servidor de mídia no meio = menor latência e qualidade máxima). Para 2–5 pessoas é perfeito; com bem mais gente transmitindo 4K, o upload de quem transmite vira o limite.
 

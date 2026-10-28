@@ -83,7 +83,7 @@ export class Chat {
 
   emptyState() {
     const g = this.app.group(this.groupId);
-    return el('div', { class: 'chat-empty' }, el('div', { class: 'chat-empty-ic' }, g?.icon || '💞'), el('h3', {}, `Começo de ${g?.name || 'conversa'}`), el('p', {}, 'Mande um oi, uma figurinha ou crie um GIF de vocês ✨'));
+    return el('div', { class: 'chat-empty' }, el('div', { class: 'chat-empty-ic' }, g?.icon || '💬'), el('h3', {}, `Começo de ${g?.name || 'conversa'}`), el('p', {}, 'Mande um oi, uma figurinha ou crie um GIF ✨'));
   }
 
   async loadOlder() {

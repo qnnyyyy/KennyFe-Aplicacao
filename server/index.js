@@ -1,4 +1,4 @@
-// KennyFe — servidor principal (HTTP/HTTPS + API + Socket.IO)
+// Kenfeh — servidor principal (HTTP/HTTPS + API + Socket.IO)
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -65,7 +65,7 @@ async function main() {
       .flat()
       .filter((i) => i && i.family === 'IPv4' && !i.internal)
       .map((i) => `${proto}://${i.address}:${PORT}`);
-    console.log(`\n  💞 KennyFe rodando!`);
+    console.log(`\n  ⚡ Kenfeh rodando!`);
     console.log(`  ➜ Local:   ${proto}://localhost:${PORT}`);
     lan.forEach((u) => console.log(`  ➜ Rede:    ${u}${USE_HTTPS ? '' : '  (câmera/tela exigem HTTPS fora do localhost — use npm run https)'}`));
     console.log(`  ➜ Banco:   ${DB_PATH}\n`);

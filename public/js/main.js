@@ -1,4 +1,4 @@
-// KennyFe — inicialização, login, grupos e navegação.
+// Kenfeh — inicialização, login, grupos e navegação.
 import { el, $, $$, icon, setIcon, avatar, toast, modal, prompt, contextMenu, onContext, store, save, sfx } from './ui.js';
 import { api } from './api.js';
 import { Chat } from './chat.js';
@@ -7,7 +7,7 @@ import { openSettings } from './settings-ui.js';
 import { emojiPicker } from './emoji.js';
 import { popover, closeMenu } from './ui.js';
 
-const GROUP_ICONS = ['💞', '🍿', '🎮', '🎬', '🌙', '🐱', '🌸', '🔥', '🎧', '🏠', '✨', '🍕'];
+const GROUP_ICONS = ['🎮', '🍿', '🎬', '🎧', '🔥', '⚡', '🌙', '👾', '🏆', '🐱', '✨', '🍕'];
 
 const app = {
   me: null,
@@ -48,11 +48,12 @@ function showAuth() {
     $$('.auth-tabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === m));
     $('.auth-tabs').dataset.mode = m;
     form.classList.toggle('register', m === 'register');
-    $('#auth-submit').textContent = m === 'login' ? 'Entrar' : 'Criar conta 💖';
+    $('#auth-submit').textContent = m === 'login' ? 'Entrar' : 'Criar conta';
     form.password.autocomplete = m === 'login' ? 'current-password' : 'new-password';
     $('#auth-error').textContent = '';
   };
   $$('.auth-tabs button').forEach((b) => (b.onclick = () => setMode(b.dataset.tab)));
+  api.get('/public-config').then((c) => $('#access-code-field').classList.toggle('hidden', !c.registerCodeRequired)).catch(() => {});
   setMode('login');
   form.onsubmit = async (e) => {
     e.preventDefault();
@@ -60,7 +61,7 @@ function showAuth() {
     btn.disabled = true;
     $('#auth-error').textContent = '';
     try {
-      const body = { username: form.username.value, password: form.password.value, displayName: form.displayName.value };
+      const body = { username: form.username.value, password: form.password.value, displayName: form.displayName.value, accessCode: form.accessCode.value };
       const { user } = await api.post(mode === 'login' ? '/auth/login' : '/auth/register', body);
       start(user);
     } catch (err) {
@@ -166,7 +167,7 @@ app.notify = (m) => {
   const g = app.group(m.groupId);
   const body = m.type === 'text' ? m.content : { sticker: '🌟 figurinha', gif: '🎞️ GIF', image: '🖼️ imagem', video: '🎥 vídeo', audio: '🎵 áudio', file: '📎 arquivo' }[m.type];
   try {
-    const n = new Notification(`${m.author?.displayName || ''} • ${g?.name || 'KennyFe'}`, { body, icon: m.author?.avatarUrl || undefined, tag: 'kf-' + m.groupId });
+    const n = new Notification(`${m.author?.displayName || ''} • ${g?.name || 'Kenfeh'}`, { body, icon: m.author?.avatarUrl || undefined, tag: 'kf-' + m.groupId });
     n.onclick = () => { window.focus(); selectGroup(m.groupId); n.close(); };
   } catch {}
 };
@@ -219,7 +220,7 @@ function renderRail() {
 
 function renderSidebar() {
   const g = app.group(app.currentGroupId);
-  $('#sidebar-title').textContent = g ? `${g.icon} ${g.name}` : 'KennyFe';
+  $('#sidebar-title').textContent = g ? `${g.icon} ${g.name}` : 'Kenfeh';
   $('#btn-group-menu').classList.toggle('hidden', !g);
   $('.sidebar-body').classList.toggle('hidden', !g);
 }
@@ -330,7 +331,7 @@ function renderRoomLayout() {
 function groupMenu(g, x, y) {
   contextMenu(x, y, [
     { type: 'title', label: `${g.icon} ${g.name}` },
-    { label: `Convite: ${g.inviteCode} (copiar)`, icon: 'link', onClick: () => { navigator.clipboard.writeText(g.inviteCode); toast('Código copiado! Manda pra quem você quer chamar 💌', 'success'); } },
+    { label: `Convite: ${g.inviteCode} (copiar)`, icon: 'link', onClick: () => { navigator.clipboard.writeText(g.inviteCode); toast('Código copiado! Manda pra quem você quer chamar.', 'success'); } },
     { label: 'Adicionar pessoa pelo @usuário', icon: 'plus', onClick: () => addMember(g) },
     { label: 'Renomear / trocar ícone', icon: 'edit', onClick: () => editGroup(g) },
     { label: 'Gerar novo convite', icon: 'link', onClick: () => api.post(`/groups/${g.id}/invite/reset`).then(() => toast('Novo código gerado.')) },
@@ -340,11 +341,11 @@ function groupMenu(g, x, y) {
 }
 
 async function addMember(g) {
-  const username = await prompt({ title: 'Adicionar ao grupo', label: 'Usuário da pessoa (sem @)', placeholder: 'ex.: fe_linda', okLabel: 'Adicionar' });
+  const username = await prompt({ title: 'Adicionar ao grupo', label: 'Usuário da pessoa (sem @)', placeholder: 'ex.: joao_silva', okLabel: 'Adicionar' });
   if (!username) return;
   try {
     await api.post(`/groups/${g.id}/members`, { username: username.replace(/^@/, '') });
-    toast('Adicionado(a)! 💞', 'success');
+    toast('Adicionado(a)!', 'success');
   } catch (err) {
     toast(err.message, 'error');
   }
@@ -386,8 +387,8 @@ function leaveGroup(g) {
 }
 
 function newGroupDialog(startTab = 'create') {
-  let ic = '💞';
-  const name = el('input', { class: 'input', placeholder: 'Ex.: Nosso cantinho', maxlength: 40 });
+  let ic = '🎮';
+  const name = el('input', { class: 'input', placeholder: 'Ex.: Resenha da noite', maxlength: 40 });
   const code = el('input', { class: 'input code-input', placeholder: 'ABCD1234', maxlength: 8 });
   const createPane = el('div', {}, el('label', { class: 'field' }, el('span', {}, 'Nome do grupo'), name), el('div', { class: 'field' }, el('span', {}, 'Ícone'), iconPicker(ic, (i) => (ic = i))));
   const joinPane = el('div', {}, el('label', { class: 'field' }, el('span', {}, 'Código de convite'), code), el('p', { class: 'muted small' }, 'Peça o código pra quem criou o grupo (botão direito no ícone do grupo → Convite).'));
@@ -397,7 +398,7 @@ function newGroupDialog(startTab = 'create') {
   const render = () => {
     tabs.replaceChildren(
       el('button', { class: tab === 'create' ? 'active' : '', onclick: () => { tab = 'create'; render(); } }, '✨ Criar grupo'),
-      el('button', { class: tab === 'join' ? 'active' : '', onclick: () => { tab = 'join'; render(); } }, '💌 Tenho um convite')
+      el('button', { class: tab === 'join' ? 'active' : '', onclick: () => { tab = 'join'; render(); } }, '🔗 Tenho um convite')
     );
     body.replaceChildren(tab === 'create' ? createPane : joinPane);
     setTimeout(() => (tab === 'create' ? name : code).focus(), 30);

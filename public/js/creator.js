@@ -171,7 +171,7 @@ function stickerEditor(done) {
     addLayer({ type: 'image', src: source, w, h, x: S / 2, y: S / 2, scale, rot: 0 });
   }
 
-  function addText(text = 'Te amo!', isEmoji = false) {
+  function addText(text = 'Sua frase', isEmoji = false) {
     addLayer({ type: isEmoji ? 'emoji' : 'text', text, font: 'Anton', size: isEmoji ? 140 : 72, color: '#ffffff', stroke: '#000000', strokeWidth: isEmoji ? 0 : 10, x: S / 2, y: isEmoji ? S / 2 : S * 0.82, rot: 0, scale: 1 });
   }
 
@@ -264,7 +264,7 @@ function stickerEditor(done) {
       ctx.save();
       ctx.translate(selected.x, selected.y);
       ctx.rotate((selected.rot * Math.PI) / 180);
-      ctx.strokeStyle = '#ff5fa2';
+      ctx.strokeStyle = '#3d8bff';
       ctx.setLineDash([8, 6]);
       ctx.lineWidth = 2;
       ctx.strokeRect(-b.w / 2, -b.h / 2, b.w, b.h);
@@ -780,7 +780,7 @@ function gifMaker(done) {
         gif.finish();
         const blob = new Blob([gif.bytes()], { type: 'image/gif' });
         save.textContent = 'Enviando…';
-        const up = await api.upload(new File([blob], 'kennyfe.gif', { type: 'image/gif' }), 'gif', name.value);
+        const up = await api.upload(new File([blob], 'kenfeh.gif', { type: 'image/gif' }), 'gif', name.value);
         toast(`GIF criado! (${(blob.size / 1024 / 1024).toFixed(1)} MB) 🎉`, 'success');
         done(up.sticker);
       } catch (err) {

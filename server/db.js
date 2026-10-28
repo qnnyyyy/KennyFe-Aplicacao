@@ -36,7 +36,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS groups (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     name        TEXT NOT NULL,
-    icon        TEXT NOT NULL DEFAULT '💞',
+    icon        TEXT NOT NULL DEFAULT '🎮',
     owner_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     invite_code TEXT NOT NULL UNIQUE,
     created_at  INTEGER NOT NULL DEFAULT (unixepoch())

@@ -30,6 +30,54 @@ const upload = multer({
   fileFilter: (_req, file, cb) => cb(null, Boolean(ALLOWED_MIME[file.mimetype])),
 });
 
+// Limite simples de tentativas (login/cadastro) por IP — o site fica aberto na internet
+const attempts = new Map();
+function rateLimit(max, windowMs) {
+  return (req, res, next) => {
+    const ip = req.headers['cf-connecting-ip'] || req.ip;
+    const now = Date.now();
+    const key = req.path + '|' + ip;
+    const a = attempts.get(key);
+    if (!a || now - a.start > windowMs) attempts.set(key, { start: now, n: 1 });
+    else if (++a.n > max) return res.status(429).json({ error: 'Muitas tentativas. Espere um minutinho e tente de novo.' });
+    next();
+  };
+}
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, a] of attempts) if (now - a.start > 15 * 60e3) attempts.delete(k);
+}, 60e3).unref();
+
+// TURN da Cloudflare (gratuito até 1 TB/mês): credenciais temporárias geradas pelo servidor
+let cfTurn = { at: 0, servers: null };
+async function cloudflareTurn() {
+  const keyId = process.env.CF_TURN_KEY_ID;
+  const token = process.env.CF_TURN_API_TOKEN;
+  if (!keyId || !token) return [];
+  if (cfTurn.servers && Date.now() - cfTurn.at < 6 * 3600e3) return cfTurn.servers;
+  try {
+    const r = await fetch(`https://rtc.live.cloudflare.com/v1/turn/keys/${keyId}/credentials/generate-ice-servers`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ttl: 86400 }),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    const list = Array.isArray(data.iceServers) ? data.iceServers : [data.iceServers];
+    // navegadores não aceitam a porta 53, então removemos essas URLs
+    cfTurn = {
+      at: Date.now(),
+      servers: list
+        .map((s) => ({ ...s, urls: [].concat(s.urls).filter((u) => !/:53(\?|$)/.test(u)) }))
+        .filter((s) => s.urls.length),
+    };
+    return cfTurn.servers;
+  } catch (err) {
+    console.warn('[turn] Cloudflare TURN indisponível:', err.message);
+    return cfTurn.servers || [];
+  }
+}
+
 function inviteCode() {
   return crypto.randomBytes(5).toString('base64url').replace(/[-_]/g, 'x').slice(0, 8).toUpperCase();
 }
@@ -103,7 +151,10 @@ function buildRouter(io, hub) {
   };
 
   // ---------- Conta ----------
-  r.post('/auth/register', (req, res) => {
+  r.post('/auth/register', rateLimit(5, 60 * 60e3), (req, res) => {
+    const required = process.env.REGISTER_CODE;
+    if (required && String(req.body.accessCode || '').trim() !== required)
+      return res.status(403).json({ error: 'Código de acesso inválido. Peça pra quem administra o site.' });
     const username = String(req.body.username || '').trim().toLowerCase();
     const displayName = String(req.body.displayName || '').trim() || username;
     const password = String(req.body.password || '');
@@ -121,7 +172,7 @@ function buildRouter(io, hub) {
     res.json({ user: auth.publicUser(db.prepare('SELECT * FROM users WHERE id = ?').get(info.lastInsertRowid)) });
   });
 
-  r.post('/auth/login', (req, res) => {
+  r.post('/auth/login', rateLimit(10, 5 * 60e3), (req, res) => {
     const username = String(req.body.username || '').trim().toLowerCase();
     const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
     if (!user || !auth.verifyPassword(String(req.body.password || ''), user.password_hash))
@@ -137,8 +188,10 @@ function buildRouter(io, hub) {
     res.json({ ok: true });
   });
 
-  r.get('/config', (_req, res) => {
-    const iceServers = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }];
+  r.get('/public-config', (_req, res) => res.json({ registerCodeRequired: Boolean(process.env.REGISTER_CODE) }));
+
+  r.get('/config', async (_req, res) => {
+    const iceServers = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }, ...(await cloudflareTurn())];
     if (process.env.TURN_URL) {
       iceServers.push({
         urls: process.env.TURN_URL.split(',').map((s) => s.trim()),
@@ -183,7 +236,7 @@ function buildRouter(io, hub) {
 
   r.post('/groups', (req, res) => {
     const name = String(req.body.name || '').trim().slice(0, 40);
-    const icon = String(req.body.icon || '💞').slice(0, 8);
+    const icon = String(req.body.icon || '🎮').slice(0, 8);
     if (!name) return res.status(400).json({ error: 'Dê um nome ao grupo.' });
     const info = db.prepare('INSERT INTO groups (name, icon, owner_id, invite_code) VALUES (?, ?, ?, ?)').run(name, icon, req.user.id, inviteCode());
     db.prepare("INSERT INTO group_members (group_id, user_id, role) VALUES (?, ?, 'owner')").run(info.lastInsertRowid, req.user.id);
@@ -224,7 +277,7 @@ function buildRouter(io, hub) {
     if (!u) return res.status(404).json({ error: 'Usuário não encontrado.' });
     if (!isMember(req.group.id, u.id)) {
       db.prepare('INSERT INTO group_members (group_id, user_id) VALUES (?, ?)').run(req.group.id, u.id);
-      hub.broadcastMessage(createMessage({ groupId: req.group.id, userId: u.id, type: 'system', content: `foi adicionado(a) por ${req.user.display_name} 💌` }));
+      hub.broadcastMessage(createMessage({ groupId: req.group.id, userId: u.id, type: 'system', content: `foi adicionado(a) por ${req.user.display_name}` }));
     }
     notifyGroup(req.group.id);
     res.json({ ok: true });

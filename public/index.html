@@ -3,9 +3,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0d0a14" />
-  <title>KennyFe 💞</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💞</text></svg>" />
+  <meta name="theme-color" content="#090b14" />
+  <meta name="description" content="Kenfeh — calls, compartilhamento de tela em alta qualidade, chat, figurinhas e GIFs." />
+  <title>Kenfeh</title>
+  <link rel="icon" type="image/svg+xml" href="/img/logo.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Anton&family=Bangers&family=Pacifico&display=swap" rel="stylesheet" />
@@ -18,9 +19,9 @@
   <section id="auth" class="auth hidden">
     <div class="auth-card glass">
       <div class="brand">
-        <div class="brand-logo">💞</div>
-        <h1>Kenny<span>Fe</span></h1>
-        <p>Nosso cantinho pra assistir, jogar e conversar juntinhos.</p>
+        <img class="brand-logo" src="/img/logo.svg" alt="" />
+        <h1>Ken<span>feh</span></h1>
+        <p>Calls em alta, telas sem limite e figurinhas com a galera.</p>
       </div>
       <div class="auth-tabs" role="tablist">
         <button class="active" data-tab="login" role="tab">Entrar</button>
@@ -29,8 +30,12 @@
       </div>
       <form id="auth-form" autocomplete="on">
         <label class="field register-only">
-          <span>Como quer ser chamado(a)</span>
+          <span>Nome de exibição</span>
           <input class="input" name="displayName" maxlength="32" placeholder="Ex.: Kenny" autocomplete="nickname" />
+        </label>
+        <label class="field register-only hidden" id="access-code-field">
+          <span>Código de acesso</span>
+          <input class="input" name="accessCode" maxlength="64" placeholder="Pedido pra quem administra o site" autocomplete="off" />
         </label>
         <label class="field">
           <span>Usuário</span>
@@ -49,7 +54,7 @@
   <!-- ===== Aplicativo ===== -->
   <section id="app" class="app hidden">
     <aside class="rail">
-      <div class="rail-brand" title="KennyFe">💞</div>
+      <img class="rail-brand" src="/img/logo.svg" alt="Kenfeh" title="Kenfeh" />
       <div class="rail-sep"></div>
       <nav id="group-rail" class="rail-groups"></nav>
       <button class="rail-btn rail-add" id="btn-new-group" title="Criar ou entrar em um grupo">+</button>
@@ -85,9 +90,9 @@
       <!-- Tela inicial sem grupo -->
       <div class="welcome" id="welcome">
         <div class="welcome-inner">
-          <div class="welcome-heart">💞</div>
+          <img class="welcome-logo" src="/img/logo.svg" alt="" />
           <h2>Oi, <span id="welcome-name"></span>!</h2>
-          <p>Crie um grupo pra vocês dois (ou pra galera) e chame quem quiser com o código de convite.</p>
+          <p>Crie um grupo e chame a galera com o código de convite. Call, tela, chat e figurinhas no mesmo lugar.</p>
           <div class="welcome-actions">
             <button class="btn btn-primary btn-lg" id="welcome-create">Criar grupo</button>
             <button class="btn btn-ghost btn-lg" id="welcome-join">Entrar com convite</button>

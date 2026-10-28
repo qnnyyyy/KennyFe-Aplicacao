@@ -1,5 +1,5 @@
 // "Palco" da call: blocos de vídeo redimensionáveis (arrasta as divisórias),
-// blocos flutuantes (ex.: webcam dela por cima do filme), reordenação,
+// blocos flutuantes (ex.: webcam por cima do filme), reordenação,
 // tela cheia por bloco, janela separada e Picture-in-Picture.
 import { el, icon, avatar, store, save, onContext } from '../ui.js';
 
@@ -287,7 +287,7 @@ export class Stage {
     if (existing && !existing.closed) return existing.focus();
     const w = window.open('', `kf_${key.replace(/\W/g, '')}`, 'popup=yes,width=1280,height=760');
     if (!w) return;
-    w.document.title = `${t.info.name} — KennyFe`;
+    w.document.title = `${t.info.name} — Kenfeh`;
     w.document.body.innerHTML = '';
     const style = w.document.createElement('style');
     style.textContent = `html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:system-ui}

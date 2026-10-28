@@ -11,7 +11,7 @@ export function openSettings(app, tab = 'account') {
   const pane = el('div', { class: 'settings-pane' });
   let cleanup = () => {};
   const tabs = [
-    ['account', 'heart', 'Minha conta'],
+    ['account', 'users', 'Minha conta'],
     ['voice', 'mic', 'Voz e vídeo'],
     ['stream', 'monitor', 'Transmissão'],
     ['keys', 'type', 'Atalhos'],
@@ -47,7 +47,7 @@ function accountPane(app) {
   let avatarUrl = me.avatarUrl;
   const preview = el('div', { class: 'profile-preview' });
   const name = el('input', { class: 'input', value: me.displayName, maxlength: 32 });
-  const status = el('input', { class: 'input', value: me.statusText || '', maxlength: 80, placeholder: 'Ex.: assistindo filme com o mozão 🍿' });
+  const status = el('input', { class: 'input', value: me.statusText || '', maxlength: 80, placeholder: 'Ex.: jogando Valorant 🎮' });
   const renderPreview = () => preview.replaceChildren(avatar({ ...me, color, avatarUrl, displayName: name.value }, 84), el('div', {}, el('b', {}, name.value || me.username), el('small', {}, '@' + me.username), el('small', { class: 'muted' }, status.value)));
   name.addEventListener('input', renderPreview);
   status.addEventListener('input', renderPreview);
@@ -77,7 +77,7 @@ function accountPane(app) {
         const { user } = await api.patch('/me', body);
         app.setMe(user);
         curPass.value = newPass.value = '';
-        toast('Perfil salvo 💖', 'success');
+        toast('Perfil salvo!', 'success');
       } catch (err) {
         toast(err.message, 'error');
       }
