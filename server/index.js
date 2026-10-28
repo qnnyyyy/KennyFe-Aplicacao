@@ -74,22 +74,11 @@ async function main() {
 
   // Arquivos enviados só para quem está logado
   app.use('/uploads', auth.requireAuth, express.static(UPLOAD_DIR, { maxAge: '30d', immutable: true }));
-  // Agente do Modo Coop (Windows): o .bat baixa o script e já libera este site
-  app.get('/agent/kenfeh-agent.ps1', (_req, res) => res.type('text/plain').sendFile(path.join(__dirname, '..', 'agent', 'kenfeh-agent.ps1')));
-  app.get('/agent/Kenfeh-Coop.bat', (req, res) => {
-    const origin = `${req.protocol}://${req.get('host')}`.replace(/[^\w:/.\-]/g, '');
-    const bat = [
-      '@echo off',
-      'title Kenfeh Coop',
-      'if not exist "%LOCALAPPDATA%\\Kenfeh" mkdir "%LOCALAPPDATA%\\Kenfeh"',
-      `echo Baixando o agente de ${origin} ...`,
-      `powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-WebRequest -UseBasicParsing '${origin}/agent/kenfeh-agent.ps1' -OutFile (Join-Path $env:LOCALAPPDATA 'Kenfeh\\kenfeh-agent.ps1')"`,
-      `powershell -NoProfile -ExecutionPolicy Bypass -File "%LOCALAPPDATA%\\Kenfeh\\kenfeh-agent.ps1" -Origins "${origin}"`,
-      'pause',
-      '',
-    ].join('\r\n');
-    res.setHeader('Content-Disposition', 'attachment; filename="Kenfeh-Coop.bat"');
-    res.type('application/octet-stream').send(bat);
+  // App do Modo Coop (Windows): um .exe só, com o controle virtual embutido
+  app.get('/download/KenfehCoop.exe', (_req, res) => {
+    res.setHeader('Content-Disposition', 'attachment; filename="KenfehCoop.exe"');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.sendFile(path.join(__dirname, '..', 'agent', 'dist', 'KenfehCoop.exe'));
   });
   const skinsJs = (_req, res) => res.type('application/javascript').send(`export const TETRIS_SKINS = ${JSON.stringify(require('./tetris-skins').TETRIS_SKINS)};`);
   app.get('/js/tetris-skins.js', skinsJs);

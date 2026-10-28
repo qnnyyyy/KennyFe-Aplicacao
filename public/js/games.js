@@ -126,7 +126,7 @@ export class GamesHub {
           el('div', { class: 'hub-coop-ic' }, '🕹️'),
           el('div', {},
             el('h3', {}, 'Jogo Coop pela tela'),
-            el('p', { class: 'muted small' }, 'Compartilhe a tela do seu jogo em "Modo Coop" e deixe o amigo jogar junto: o teclado, o mouse e o controle dele funcionam no SEU PC. Ideal para jogos com coop local (It Takes Two, Cuphead, Overcooked, emuladores…).'),
+            el('p', { class: 'muted small' }, 'Compartilhe a tela do seu jogo em "Modo Coop": você continua jogando e cada amigo vira um jogador separado no SEU PC (Jogador 2, 3, 4) — como um coop local. Os amigos não instalam nada. Ideal para It Takes Two, Cuphead, Overcooked, emuladores…'),
             el('button', { class: 'btn btn-primary btn-sm', onclick: () => this.app.call.coop.openHostDialog() }, '🎮 Abrir Modo Coop')
           )
         ),

@@ -1,0 +1,9 @@
+Componentes de terceiros embutidos no KenfehCoop.exe
+
+- ViGEmBus_Setup.exe — driver de controle virtual (ViGEmBus 1.22.0, assinado), de
+  https://github.com/nefarius/ViGEmBus — licença BSD-3-Clause.
+  Origem: https://github.com/nefarius/ViGEmBus/releases/download/v1.22.0/ViGEmBus_1.22.0_x64_x86_arm64.exe
+
+- Nefarius.ViGEm.Client.dll — biblioteca cliente (1.21.256), de
+  https://github.com/nefarius/ViGEm.NET — licença MIT.
+  Origem: pacote NuGet Nefarius.ViGEm.Client 1.21.256 (lib/netstandard2.0)

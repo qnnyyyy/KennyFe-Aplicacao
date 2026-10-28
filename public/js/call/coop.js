@@ -5,6 +5,15 @@ import { el, icon, toast, modal, sfx, store, save, $ } from '../ui.js';
 import { api } from '../api.js';
 
 const AGENT_URL = 'ws://localhost:47821';
+// Teclado + mouse do convidado viram um controle de Xbox (o jogo vê um jogador separado)
+const KB_BUTTONS = {
+  Space: 0, KeyF: 1, ShiftLeft: 1, KeyE: 2, KeyR: 3, KeyQ: 4, KeyG: 5, Tab: 8, Enter: 9, Escape: 9,
+  ControlLeft: 10, KeyV: 11, ArrowUp: 12, ArrowDown: 13, ArrowLeft: 14, ArrowRight: 15,
+};
+export const KB_LEGEND = [
+  ['WASD', 'analógico esquerdo'], ['Mouse', 'analógico direito (câmera)'], ['Espaço', 'A'], ['F / Shift', 'B'], ['E', 'X'], ['R', 'Y'],
+  ['Q / G', 'LB / RB'], ['Botão dir. / Z', 'LT'], ['Botão esq. / C', 'RT'], ['Setas', 'direcional'], ['Enter / Esc', 'Start'], ['Tab', 'Select'], ['Ctrl / V', 'L3 / R3'],
+];
 const CODE_RE = /^[A-Za-z0-9]{1,24}$/;
 
 export class CoopController {
@@ -67,13 +76,16 @@ export class CoopController {
           const [res] = size.split('@');
           return { index: Number(i), label: `Monitor ${Number(i) + 1} — ${res.replace('x', '×')}${primary === 'p' ? ' (principal)' : ''}` };
         });
-        if (!silent) toast('🕹️ Agente Kenfeh Coop conectado!', 'success');
+        if (!silent) toast('🕹️ App Kenfeh Coop conectado!', 'success');
         if (this.hosting) this.sendAgent(`mon ${this.hosting.monitor}`);
       } else if (cmd === 'err') {
         this.agentState = 'off';
         save('agent-code', null);
         if (!silent) toast('Código do agente incorreto. Confira o número na janela do Kenfeh Coop.', 'error', 6000);
         ws.close();
+      } else if (cmd === 'stop') {
+        this.revokeAll();
+        toast('🛑 Você parou tudo pelo app Kenfeh Coop.', 'success');
       } else if (cmd === 'game') {
         this.onGameDetected(rest.join(' '));
       }
@@ -85,7 +97,7 @@ export class CoopController {
       this.agentState = 'off';
       this.agent = null;
       if (was === 'on' && this.hosting) toast('O agente Kenfeh Coop desconectou — os convidados não conseguem mais jogar.', 'error', 6000);
-      if (was === 'connecting' && !silent) toast('Não achei o agente. Ele está aberto no seu PC? (Kenfeh-Coop.bat)', 'error', 6000);
+      if (was === 'connecting' && !silent) toast('Não achei o app Kenfeh Coop. Ele está aberto no seu PC?', 'error', 6000);
       this.refreshDialog?.();
     };
   }
@@ -145,8 +157,10 @@ export class CoopController {
     if (slot < 0) return toast('Máximo de 4 jogadores convidados.', 'error');
     g.status = 'playing';
     g.slot = slot;
+    const name = this.app.userName(g.userId).replace(/\s+/g, ' ').slice(0, 30);
+    this.sendAgent(`label ${slot} ${name}`);
     this.call.pm.sendData(peerId, { t: 'coop-grant', screenId: this.hosting.screenId, perms: this.hosting.perms, slot });
-    toast(`${this.app.userName(g.userId)} entrou no seu jogo 🎮 (Ctrl+Shift+X corta o controle)`, 'success', 5000);
+    toast(`${name} entrou no seu jogo como Jogador ${slot + 2} 🎮 (Ctrl+Shift+X corta o controle)`, 'success', 5000);
     this.refreshDialog?.();
   }
 
@@ -237,7 +251,9 @@ export class CoopController {
     const g = this.guests.get(peerId);
     if (!g || g.status !== 'playing' || !this.hosting) return;
     const p = this.hosting.perms;
+    const shared = p.mode === 'shared';
     g.last = Date.now();
+    if (m.t !== 'pad' && m.t !== 'rel' && !shared) return; // modo jogador separado: só controle
     switch (m.t) {
       case 'k':
         if (!p.kb || !CODE_RE.test(m.c) || /^(Meta|OS)/.test(m.c)) return;
@@ -258,7 +274,7 @@ export class CoopController {
         if (p.mouse) this.sendAgent(`mw ${Math.round(m.d) || 0}`);
         break;
       case 'pad':
-        if (p.pad && Array.isArray(m.s) && m.s.length === 7) this.sendAgent(`pad ${g.slot} ${m.s.map((v) => Math.round(+v) || 0).join(' ')}`);
+        if (Array.isArray(m.s) && m.s.length === 7) this.sendAgent(`pad ${g.slot} ${m.s.map((v) => Math.round(+v) || 0).join(' ')}`);
         break;
       case 'rel':
         this.releaseGuest(g);
@@ -295,19 +311,32 @@ export class CoopController {
     this.boundTile = tile;
     const v = tile.video;
     const c = this.controlling;
+    const padMode = c.perms.mode !== 'shared';
+    this.padKeys = new Set();
+    this.padMouse = new Set();
+    this.rs = [0, 0];
+    tile.coopHint.textContent = padMode
+      ? `🎮 Você é o Jogador ${c.slot + 2} — clique no vídeo para jogar (teclado e mouse viram controle) • Esc solta • Ctrl+Shift+Q sai`
+      : '🎮 Jogando no teclado/mouse do host — clique no vídeo • Esc solta o mouse • Ctrl+Shift+Q sai';
+    const relative = padMode || c.perms.mouseMode === 'rel';
+    const useMouse = padMode || c.perms.mouse;
     const onDown = (e) => {
       if (e.target.closest('.tile-actions, .tile-coop')) return;
       this.setActive(true);
-      if (c.perms.mouse && c.perms.mouseMode === 'rel' && document.pointerLockElement !== v) v.requestPointerLock?.();
-      if (c.perms.mouse) {
-        e.preventDefault();
-        this.send({ t: 'mb', b: e.button, d: 1 });
-      }
+      if (useMouse && relative && document.pointerLockElement !== v) v.requestPointerLock?.();
+      if (!useMouse) return;
+      e.preventDefault();
+      if (padMode) this.padMouse.add(e.button);
+      else this.send({ t: 'mb', b: e.button, d: 1 });
     };
-    const onUp = (e) => this.active && c.perms.mouse && this.send({ t: 'mb', b: e.button, d: 0 });
+    const onUp = (e) => {
+      if (!this.active || !useMouse) return;
+      if (padMode) this.padMouse.delete(e.button);
+      else this.send({ t: 'mb', b: e.button, d: 0 });
+    };
     const onMove = (e) => {
-      if (!this.active || !c.perms.mouse) return;
-      if (c.perms.mouseMode === 'rel') {
+      if (!this.active || !useMouse) return;
+      if (relative) {
         this.acc.x += e.movementX;
         this.acc.y += e.movementY;
       } else {
@@ -316,7 +345,7 @@ export class CoopController {
       }
     };
     const onWheel = (e) => {
-      if (!this.active || !c.perms.mouse) return;
+      if (!this.active || !useMouse || padMode) return;
       e.preventDefault();
       this.send({ t: 'mw', d: -Math.sign(e.deltaY) * 120 });
     };
@@ -330,7 +359,7 @@ export class CoopController {
     document.addEventListener('pointerdown', this.outside, true);
     this.blur = () => this.setActive(false);
     window.addEventListener('blur', this.blur);
-    this.lockChange = () => c.perms.mouseMode === 'rel' && document.pointerLockElement !== v && this.setActive(false);
+    this.lockChange = () => relative && useMouse && document.pointerLockElement !== v && this.setActive(false);
     document.addEventListener('pointerlockchange', this.lockChange);
     window.addEventListener('keydown', this.boundKeys, true);
     window.addEventListener('keyup', this.boundKeys, true);
@@ -350,8 +379,12 @@ export class CoopController {
     this.absPos = null;
     this.lastPad = '';
     this.lastPadAt = 0;
-    const loop = () => {
+    let last = performance.now();
+    const loop = (t = performance.now()) => {
       this.raf = requestAnimationFrame(loop);
+      const dt = Math.max(1, t - last);
+      last = t;
+      if (padMode) return this.pollPad(dt, true);
       if (this.acc.x || this.acc.y) {
         this.send({ t: 'mm', x: this.acc.x, y: this.acc.y });
         this.acc = { x: 0, y: 0 };
@@ -360,7 +393,7 @@ export class CoopController {
         this.send({ t: 'ma', x: this.absPos[0], y: this.absPos[1] });
         this.absPos = null;
       }
-      if (c.perms.pad) this.pollPad();
+      this.pollPad(dt, false);
     };
     loop();
   }
@@ -378,7 +411,11 @@ export class CoopController {
     if (this.active === on) return;
     this.active = on;
     this.boundTile?.el.classList.toggle('capturing', on);
-    if (!on) this.send({ t: 'rel' });
+    if (!on) {
+      this.padKeys?.clear();
+      this.padMouse?.clear();
+      this.send({ t: 'rel' });
+    }
   }
 
   onKey(e) {
@@ -387,32 +424,62 @@ export class CoopController {
       e.preventDefault();
       return this.stopControl();
     }
-    if (!this.active || !this.controlling.perms.kb) return;
+    const padMode = this.controlling.perms.mode !== 'shared';
+    if (!this.active || (!padMode && !this.controlling.perms.kb)) return;
     if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName)) return;
     e.preventDefault();
     e.stopPropagation();
+    if (padMode) {
+      if (e.type === 'keydown') this.padKeys.add(e.code);
+      else this.padKeys.delete(e.code);
+      return;
+    }
     if (e.repeat) return;
     this.send({ t: 'k', d: e.type === 'keydown' ? 1 : 0, c: e.code });
   }
 
-  pollPad() {
+  pollPad(dt = 16, withKeyboard = false) {
     const pads = navigator.getGamepads?.() || [];
     const gp = [...pads].find((p) => p && p.connected);
-    if (!gp) return;
     const dz = (v) => (Math.abs(v) < 0.08 ? 0 : v);
-    let mask = 0;
-    gp.buttons.forEach((b, i) => {
-      if (i !== 6 && i !== 7 && i < 17 && b.pressed) mask |= 1 << i;
-    });
-    const s = [
-      mask,
-      Math.round(dz(gp.axes[0] || 0) * 32767),
-      Math.round(-dz(gp.axes[1] || 0) * 32767),
-      Math.round(dz(gp.axes[2] || 0) * 32767),
-      Math.round(-dz(gp.axes[3] || 0) * 32767),
-      Math.round((gp.buttons[6]?.value || 0) * 255),
-      Math.round((gp.buttons[7]?.value || 0) * 255),
-    ];
+    let mask = 0, lx = 0, ly = 0, rx = 0, ry = 0, lt = 0, rt = 0;
+    if (gp) {
+      gp.buttons.forEach((b, i) => {
+        if (i !== 6 && i !== 7 && i < 17 && b.pressed) mask |= 1 << i;
+      });
+      lx = dz(gp.axes[0] || 0);
+      ly = -dz(gp.axes[1] || 0);
+      rx = dz(gp.axes[2] || 0);
+      ry = -dz(gp.axes[3] || 0);
+      lt = gp.buttons[6]?.value || 0;
+      rt = gp.buttons[7]?.value || 0;
+    }
+    if (withKeyboard && this.active) {
+      const k = this.padKeys;
+      for (const code of k) if (KB_BUTTONS[code] !== undefined) mask |= 1 << KB_BUTTONS[code];
+      // WASD -> analógico esquerdo (diagonal normalizada)
+      let kx = (k.has('KeyD') ? 1 : 0) - (k.has('KeyA') ? 1 : 0);
+      let ky = (k.has('KeyW') ? 1 : 0) - (k.has('KeyS') ? 1 : 0);
+      if (kx && ky) { kx *= 0.7071; ky *= 0.7071; }
+      if (kx || ky) { lx = kx; ly = ky; }
+      // IJKL -> analógico direito
+      const ix = (k.has('KeyL') ? 1 : 0) - (k.has('KeyJ') ? 1 : 0);
+      const iy = (k.has('KeyI') ? 1 : 0) - (k.has('KeyK') ? 1 : 0);
+      // mouse -> analógico direito (velocidade do mouse vira inclinação do stick)
+      const sens = store('coop-mouse-sens', 1) * 0.045;
+      const tx = Math.max(-1, Math.min(1, (this.acc.x / dt) * sens * 16));
+      const ty = Math.max(-1, Math.min(1, (-this.acc.y / dt) * sens * 16));
+      this.acc = { x: 0, y: 0 };
+      this.rs = [this.rs[0] * 0.55 + tx * 0.45, this.rs[1] * 0.55 + ty * 0.45];
+      if (Math.abs(this.rs[0]) < 0.02) this.rs[0] = 0;
+      if (Math.abs(this.rs[1]) < 0.02) this.rs[1] = 0;
+      if (ix || iy) { rx = ix; ry = iy; } else if (this.rs[0] || this.rs[1]) { rx = this.rs[0]; ry = this.rs[1]; }
+      if (this.padMouse.has(2) || k.has('KeyZ')) lt = 1;
+      if (this.padMouse.has(0) || k.has('KeyC')) rt = 1;
+      if (this.padMouse.has(1)) mask |= 1 << 11;
+    }
+    if (!gp && !withKeyboard) return;
+    const s = [mask, Math.round(lx * 32767), Math.round(ly * 32767), Math.round(rx * 32767), Math.round(ry * 32767), Math.round(lt * 255), Math.round(rt * 255)];
     const key = s.join(',');
     const now = performance.now();
     if (key !== this.lastPad || now - this.lastPadAt > 250) {
@@ -436,6 +503,7 @@ export class CoopController {
     const body = el('div', { class: 'coop-dialog' });
     const st = {
       screenId: this.hosting?.screenId || [...(this.call.media?.screens.keys() || [])][0] || '',
+      mode: this.hosting?.perms.mode || 'pad',
       kb: this.hosting?.perms.kb ?? true,
       mouse: this.hosting?.perms.mouse ?? true,
       mouseMode: this.hosting?.perms.mouseMode || 'abs',
@@ -452,25 +520,26 @@ export class CoopController {
       const inCall = this.call.active;
       const guests = [...this.guests.entries()];
       body.replaceChildren(...[
-        el('p', { class: 'muted' }, 'Compartilhe a tela do jogo e deixe os amigos jogarem com o teclado, mouse e controle deles — tudo chega no SEU PC como se estivesse plugado aqui. Perfeito para coop local (It Takes Two, Cuphead, Overcooked, emuladores…).'),
+        el('div', { class: 'coop-intro' },
+          el('div', {}, el('b', {}, '🎮 Vocês jogam juntos no SEU PC'), el('small', {}, 'Você continua jogando normalmente (Jogador 1). Cada amigo vira um jogador separado (Jogador 2, 3, 4) — o jogo enxerga pessoas diferentes, como num coop local.')),
+          el('div', {}, el('b', {}, '👥 Os amigos não instalam nada'), el('small', {}, 'Eles jogam pelo navegador, com controle ou com teclado e mouse.'))),
 
         el('div', { class: 'coop-step' },
           el('div', { class: 'coop-num' }, '1'),
           el('div', { class: 'coop-step-body' },
-            el('b', {}, 'Agente no seu PC (Windows)'),
-            el('small', { class: 'muted' }, 'O navegador não pode apertar teclas no seu PC sozinho, então um programinha faz isso — só depois que você aprovar alguém.'),
+            el('b', {}, 'App Kenfeh Coop no seu PC (só quem transmite, Windows)'),
+            el('small', { class: 'muted' }, 'Um app só, com tudo dentro. Na primeira vez ele ativa os controles virtuais sozinho (o Windows pede permissão uma vez).'),
             el('div', { class: 'coop-agent' },
               el('span', { class: `status-pill ${this.agentState}` }, agentOn ? '● Conectado' : this.agentState === 'connecting' ? '● Conectando…' : '● Desconectado'),
-              agentOn ? el('span', { class: 'muted small' }, this.agentInfo.vigem ? '🎮 Controle virtual OK' : '⚠️ Controle virtual indisponível (instale o ViGEmBus)') : null
+              agentOn ? el('span', { class: 'muted small' }, this.agentInfo.vigem ? '🎮 Controles virtuais prontos' : '⚠️ Clique em "Ativar controles" na janela do Kenfeh Coop') : null
             ),
             !agentOn
               ? el('div', { class: 'inline-form' },
-                  el('a', { class: 'btn btn-ghost btn-sm', href: '/agent/Kenfeh-Coop.bat', download: 'Kenfeh-Coop.bat' }, icon('download', 14), 'Baixar Kenfeh-Coop.bat'),
+                  el('a', { class: 'btn btn-ghost btn-sm', href: '/download/KenfehCoop.exe', download: 'KenfehCoop.exe' }, icon('download', 14), 'Baixar Kenfeh Coop (Windows)'),
                   code,
                   el('button', { class: 'btn btn-primary btn-sm', onclick: () => this.connectAgent(code.value.trim()) }, 'Conectar'))
               : null,
-            !agentOn ? el('small', { class: 'muted' }, 'Abra o .bat (se o Windows avisar, clique em "Mais informações → Executar assim mesmo"), digite aqui o código de 6 números que aparece na janela e clique em Conectar. Se o navegador perguntar sobre "dispositivos na rede local", permita.') : null,
-            agentOn && !this.agentInfo.vigem ? el('small', { class: 'muted' }, el('span', {}, 'Para usar controle: instale o '), el('a', { href: 'https://github.com/nefarius/ViGEmBus/releases', target: '_blank', rel: 'noopener' }, 'driver ViGEmBus'), el('span', {}, ' e abra o agente de novo. Teclado e mouse já funcionam.')) : null
+            !agentOn ? el('small', { class: 'muted' }, 'Abra o KenfehCoop.exe (se o Windows avisar, clique em "Mais informações → Executar assim mesmo"), digite aqui o código de 6 números que aparece no app e clique em Conectar. Se o navegador perguntar sobre "dispositivos na rede local", permita.') : null
           )
         ),
 
@@ -493,13 +562,22 @@ export class CoopController {
         el('div', { class: 'coop-step' },
           el('div', { class: 'coop-num' }, '3'),
           el('div', { class: 'coop-step-body' },
-            el('b', {}, 'O que os amigos podem usar'),
-            swRow('kb', 'Teclado', 'A tecla Windows fica sempre bloqueada.'),
-            swRow('mouse', 'Mouse', null),
-            el('div', { class: 'seg' },
-              el('button', { class: st.mouseMode === 'abs' ? 'active' : '', onclick: () => { st.mouseMode = 'abs'; render(); } }, '🖱️ Absoluto (menus, estratégia)'),
-              el('button', { class: st.mouseMode === 'rel' ? 'active' : '', onclick: () => { st.mouseMode = 'rel'; render(); } }, '🎯 Relativo (FPS, câmera)')),
-            swRow('pad', 'Controle (vira um controle de Xbox virtual no seu PC)', 'Cada amigo ganha o próprio controle (até 4). Precisa do ViGEmBus.')
+            el('b', {}, 'Como os amigos jogam'),
+            el('div', { class: 'choice-row' },
+              el('button', { class: `choice ${st.mode === 'pad' ? 'active' : ''}`, onclick: () => { st.mode = 'pad'; render(); } },
+                el('span', { class: 'choice-emoji' }, '🎮'), el('b', {}, 'Jogador separado'), el('small', {}, 'Recomendado. Cada amigo vira um controle próprio no seu PC — com controle de verdade ou com o teclado e mouse dele convertidos.')),
+              el('button', { class: `choice ${st.mode === 'shared' ? 'active' : ''}`, onclick: () => { st.mode = 'shared'; render(); } },
+                el('span', { class: 'choice-emoji' }, '⌨️'), el('b', {}, 'Dividir meu teclado e mouse'), el('small', {}, 'O teclado/mouse do amigo apertam no seu, junto com você. Bom para jogos de teclado dividido (P1 WASD, P2 setas), turnos e menus.'))),
+            st.mode === 'pad'
+              ? el('div', { class: 'kb-legend' }, el('small', { class: 'muted' }, 'Amigo sem controle? O teclado e o mouse dele viram controle assim:'),
+                  el('div', { class: 'kb-legend-grid' }, KB_LEGEND.map(([k, v]) => el('span', {}, el('kbd', {}, k), v))))
+              : el('div', {},
+                  swRow('kb', 'Teclado', 'A tecla Windows fica sempre bloqueada.'),
+                  swRow('mouse', 'Mouse', null),
+                  el('div', { class: 'seg' },
+                    el('button', { class: st.mouseMode === 'abs' ? 'active' : '', onclick: () => { st.mouseMode = 'abs'; render(); } }, '🖱️ Absoluto (menus, estratégia)'),
+                    el('button', { class: st.mouseMode === 'rel' ? 'active' : '', onclick: () => { st.mouseMode = 'rel'; render(); } }, '🎯 Relativo (FPS, câmera)')),
+                  el('small', { class: 'muted' }, 'Se o amigo usar um controle de verdade, ele continua sendo um jogador separado.'))
           )
         ),
 
@@ -508,14 +586,14 @@ export class CoopController {
               el('b', {}, 'Jogadores'),
               guests.map(([pid, g]) => el('div', { class: 'coop-guest' },
                 el('span', {}, `${g.status === 'playing' ? '🎮' : '⏳'} ${this.app.userName(g.userId)}`),
-                el('small', { class: 'muted' }, g.status === 'playing' ? `controle #${g.slot + 1}` : 'pedindo para jogar'),
+                el('small', { class: 'muted' }, g.status === 'playing' ? `Jogador ${g.slot + 2}` : 'pedindo para jogar'),
                 g.status === 'pending' ? el('button', { class: 'btn btn-primary btn-sm', onclick: () => this.approve(pid) }, 'Aceitar') : null,
                 el('button', { class: 'btn btn-danger btn-sm', onclick: () => (g.status === 'pending' ? this.deny(pid) : this.revoke(pid)) }, g.status === 'pending' ? 'Recusar' : 'Tirar controle'))))
           : null,
 
         el('div', { class: 'callout' },
           el('b', {}, '⚠️ Importante'),
-          el('p', {}, 'Use em jogos coop/single-player. Jogos com anti-cheat (Valorant, CS2, Fortnite…) podem bloquear ou punir input simulado. Se o jogo roda como Administrador, rode o agente como Administrador também. Atalho de pânico: Ctrl+Shift+X corta todo mundo.')
+          el('p', {}, 'Use em jogos coop/single-player. Jogos com anti-cheat (Valorant, CS2, Fortnite…) podem bloquear ou punir input simulado. Se o jogo roda como Administrador, abra o Kenfeh Coop como Administrador também. Atalho de pânico: Ctrl+Shift+X corta todo mundo.')
         ),
       ].filter(Boolean));
     };
@@ -534,8 +612,8 @@ export class CoopController {
           onClick: (c) => {
             if (!this.call.active) return toast('Entre na call primeiro.', 'error');
             if (!st.screenId || !this.call.media.screens.has(st.screenId)) return toast('Compartilhe a tela do jogo primeiro.', 'error');
-            if (this.agentState !== 'on') toast('Atenção: o agente não está conectado, então ninguém vai conseguir jogar ainda.', 'error', 6000);
-            this.startHosting({ screenId: st.screenId, perms: { kb: st.kb, mouse: st.mouse, mouseMode: st.mouseMode, pad: st.pad }, monitor: st.monitor, game: st.game.trim() });
+            if (this.agentState !== 'on') toast('Atenção: o app Kenfeh Coop não está conectado, então ninguém vai conseguir jogar ainda.', 'error', 6000);
+            this.startHosting({ screenId: st.screenId, perms: { mode: st.mode, kb: st.kb, mouse: st.mouse, mouseMode: st.mouseMode, pad: true }, monitor: st.monitor, game: st.game.trim() });
             c();
           },
         },
