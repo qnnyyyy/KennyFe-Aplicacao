@@ -112,6 +112,16 @@ class Peer {
       }
       mgr.onTrack?.(peerId, track, stream);
     };
+    this.lowLatency = (trackIds) => {
+      // jogo do Modo Coop: sem "colchão" de atraso no player (o vídeo chega o mais rápido possível)
+      for (const r of pc.getReceivers()) {
+        if (!r.track || !trackIds.includes(r.track.id)) continue;
+        try {
+          if ('jitterBufferTarget' in r) r.jitterBufferTarget = 0;
+          else r.playoutDelayHint = 0;
+        } catch {}
+      }
+    };
     pc.onconnectionstatechange = () => {
       mgr.onConnState?.(peerId, pc.connectionState);
       if (pc.connectionState === 'failed') pc.restartIce();
@@ -269,6 +279,10 @@ export class PeerManager {
     const p = new Peer(this, peerId);
     this.peers.set(peerId, p);
     return p;
+  }
+
+  lowLatency(peerId, trackIds) {
+    this.peers.get(peerId)?.lowLatency?.(trackIds);
   }
 
   removePeer(peerId) {

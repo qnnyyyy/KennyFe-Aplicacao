@@ -261,6 +261,7 @@ export class LocalMedia {
         }
       : false;
 
+    if (opt.game) video.cursor = 'always'; // quem joga junto precisa ver o mouse do host
     const base = {
       video,
       audio,
@@ -294,7 +295,8 @@ export class LocalMedia {
       fps,
       content,
       audioSourceId: null,
-      opts: this._screenOpts(r, fps, content),
+      game: Boolean(opt.game),
+      opts: this._screenOpts(r, fps, content, opt.game),
     };
     this.screens.set(scr.id, scr);
     vt.addEventListener('ended', () => this.stopScreen(scr.id));
@@ -315,12 +317,13 @@ export class LocalMedia {
     return scr;
   }
 
-  _screenOpts(r, fps, content) {
-    const cap = Math.min(r.kbps, settings().maxBitrateKbps || r.kbps);
+  // game: transmissão do Modo Coop — fluidez e resposta rápida acima de tudo
+  _screenOpts(r, fps, content, game = false) {
+    const cap = Math.min(game ? Math.round(r.kbps * 1.5) : r.kbps, settings().maxBitrateKbps || r.kbps);
     return {
       maxBitrate: cap * 1000,
       maxFramerate: fps,
-      degradationPreference: content === 'detail' ? 'maintain-resolution' : 'maintain-framerate',
+      degradationPreference: game || content !== 'detail' ? 'maintain-framerate' : 'maintain-resolution',
       priority: 'high',
     };
   }
@@ -338,7 +341,7 @@ export class LocalMedia {
     else Object.assign(c, { width: { max: 7680 }, height: { max: 4320 } });
     await scr.track.applyConstraints(c).catch(() => {});
     scr.track.contentHint = scr.content === 'detail' ? 'detail' : 'motion';
-    scr.opts = this._screenOpts(r, scr.fps, scr.content);
+    scr.opts = this._screenOpts(r, scr.fps, scr.content, scr.game);
     this.onUpdateOpts(scr.track, scr.opts);
     this.onChange();
   }

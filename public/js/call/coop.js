@@ -177,6 +177,21 @@ export class CoopController {
   // a tela do Modo Coop foi fechada
   onScreensChanged() {
     if (this.hosting && !this.call.media?.screens.has(this.hosting.screenId)) this.stopHosting();
+    this.onScreensUpdate?.();
+  }
+
+  // transmissão própria para jogo: fluidez (fps) e resposta rápida acima de nitidez
+  async shareGame({ res, fps, audio, name }) {
+    try {
+      const scr = await this.call.media.startScreen({ name: name || 'Jogo', res, fps, content: 'motion', audio, restrictOwnAudio: true, game: true });
+      save('coop-share', { res, fps, audio });
+      const v = scr.track.getSettings();
+      toast(`🎮 Jogo no ar: ${v.width}×${v.height} @ ${Math.round(v.frameRate || fps)} fps${scr.audioSourceId ? ' com som 🔊' : ''}`, 'success');
+      return scr;
+    } catch (err) {
+      if (err.name !== 'NotAllowedError') toast('Não foi possível transmitir: ' + (err.message || err.name), 'error', 5000);
+      return null;
+    }
   }
 
   approve(peerId) {
@@ -347,6 +362,8 @@ export class CoopController {
     if (!tile) return;
     this.boundTile = tile;
     const v = tile.video;
+    const ids = [...(tile.info.stream?.getTracks() || [])].map((t) => t.id);
+    this.call.pm.lowLatency(tile.info.peerId, ids);
     const c = this.controlling;
     const padMode = c.perms.mode !== 'shared';
     this.padKeys = new Set();
@@ -641,6 +658,15 @@ export class CoopController {
       pad: this.hosting?.perms.pad ?? true,
       monitor: this.hosting?.monitor ?? 0,
       game: this.hosting?.game || this.lastGame || '',
+      share: { res: '1080', fps: 60, audio: true, ...(store('coop-share', null) || {}) },
+      sharing: false,
+    };
+    const gameScreens = () => [...(this.call.media?.screens.values() || [])];
+    // compartilhou (por aqui ou pelo botão normal) com a janela aberta: aparece e já fica escolhida
+    this.onScreensUpdate = () => {
+      const list = gameScreens();
+      if (!list.some((x) => x.id === st.screenId)) st.screenId = (list.find((x) => x.game) || list[list.length - 1])?.id || '';
+      render();
     };
     const code = el('input', { class: 'input code-input sm', placeholder: '000000', maxlength: 6, inputmode: 'numeric', value: store('agent-code', '') || '' });
     const swRow = (key, label, desc) => el('label', { class: 'switch-row' }, el('input', { type: 'checkbox', checked: st[key], onchange: (e) => (st[key] = e.target.checked) }), el('span', { class: 'switch' }), el('div', {}, el('b', {}, label), desc ? el('small', {}, desc) : null));
@@ -681,12 +707,31 @@ export class CoopController {
             el('b', {}, 'Qual transmissão é o jogo?'),
             !inCall
               ? el('small', { class: 'muted' }, 'Entre na call e compartilhe a tela do jogo para continuar.')
-              : screens.length
-                ? el('div', { class: 'grid-2' },
-                    el('select', { class: 'input', onchange: (e) => (st.screenId = e.target.value) }, screens.map((s) => el('option', { value: s.id, selected: s.id === st.screenId }, s.name))),
-                    el('select', { class: 'input', title: 'Em qual monitor o jogo está (para o mouse cair no lugar certo)', onchange: (e) => (st.monitor = Number(e.target.value)) },
-                      (this.agentInfo.monitors.length ? this.agentInfo.monitors : [{ index: 0, label: 'Monitor 1' }]).map((m) => el('option', { value: m.index, selected: m.index === st.monitor }, m.label))))
-                : el('button', { class: 'btn btn-ghost btn-sm', onclick: () => this.call.shareDialog() }, icon('monitor-up', 14), 'Compartilhar a tela do jogo'),
+              : el('div', { class: 'coop-share' },
+                  screens.length
+                    ? el('div', { class: 'grid-2' },
+                        el('select', { class: 'input', onchange: (e) => (st.screenId = e.target.value) }, screens.map((s) => el('option', { value: s.id, selected: s.id === st.screenId }, `${s.game ? '🎮 ' : ''}${s.name}`))),
+                        el('select', { class: 'input', title: 'Em qual monitor o jogo está (para o mouse cair no lugar certo)', onchange: (e) => (st.monitor = Number(e.target.value)) },
+                          (this.agentInfo.monitors.length ? this.agentInfo.monitors : [{ index: 0, label: 'Monitor 1' }]).map((m) => el('option', { value: m.index, selected: m.index === st.monitor }, m.label))))
+                    : null,
+                  el('div', { class: 'game-share' },
+                    el('div', { class: 'game-share-head' }, el('b', {}, screens.length ? '➕ Transmitir outro jogo' : '🎮 Transmitir o jogo'),
+                      el('small', { class: 'muted' }, 'Transmissão feita para jogar junto: prioriza fluidez e resposta rápida (sem atraso extra no player de quem joga).')),
+                    el('div', { class: 'game-share-opts' },
+                      el('label', { class: 'field' }, el('span', {}, 'Qualidade'), el('select', { class: 'input', onchange: (e) => (st.share.res = e.target.value) },
+                        [['720', '720p — mais leve, menos atraso'], ['1080', '1080p — recomendado'], ['1440', '1440p — internet boa'], ['native', 'Original do monitor']].map(([v, t]) => el('option', { value: v, selected: st.share.res === v }, t)))),
+                      el('label', { class: 'field' }, el('span', {}, 'Fluidez'), el('select', { class: 'input', onchange: (e) => (st.share.fps = Number(e.target.value)) },
+                        [[30, '30 fps'], [60, '60 fps — recomendado'], [120, '120 fps (monitor e navegador precisam suportar)']].map(([v, t]) => el('option', { value: v, selected: Number(st.share.fps) === v }, t))))),
+                    el('label', { class: 'switch-row' }, el('input', { type: 'checkbox', checked: st.share.audio, onchange: (e) => (st.share.audio = e.target.checked) }), el('span', { class: 'switch' }),
+                      el('div', {}, el('b', {}, 'Mandar o som do jogo'), el('small', {}, 'Escolha a JANELA do jogo e marque "compartilhar áudio" — só o som do jogo vai, sem eco da call.'))),
+                    el('button', { class: 'btn btn-primary', disabled: st.sharing, onclick: async () => {
+                      st.sharing = true;
+                      render();
+                      const scr = await this.shareGame({ ...st.share, name: st.game.trim() || 'Jogo' });
+                      st.sharing = false;
+                      if (scr) st.screenId = scr.id;
+                      render();
+                    } }, icon('monitor-up', 16), st.sharing ? 'Escolha a janela do jogo…' : 'Escolher a janela do jogo'))),
             el('input', { class: 'input', placeholder: 'Nome do jogo (aparece no seu perfil) — opcional', value: st.game, list: 'kf-games-list', oninput: (e) => (st.game = e.target.value) })
           )
         ),
@@ -750,7 +795,10 @@ export class CoopController {
           },
         },
       ].filter(Boolean),
-      onClose: () => (this.refreshDialog = null),
+      onClose: () => {
+        this.refreshDialog = null;
+        this.onScreensUpdate = null;
+      },
     });
     return m;
   }
