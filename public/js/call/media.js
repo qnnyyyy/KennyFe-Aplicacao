@@ -115,7 +115,45 @@ export class LocalMedia {
   }
 
   applyEnabled(s) {
-    s.outTrack.enabled = s.transmit && !(s.kind === 'mic' && this.muted);
+    const pttBlocked = s.kind === 'mic' && settings().pttEnabled && !this.pttDown;
+    s.outTrack.enabled = s.transmit && !(s.kind === 'mic' && this.muted) && !pttBlocked;
+  }
+
+  // Push-to-talk: o mic só abre enquanto a tecla está pressionada
+  setPtt(down) {
+    if (this.pttDown === down) return;
+    this.pttDown = down;
+    for (const s of this.sources.values()) this.applyEnabled(s);
+    this.onChange();
+  }
+
+  refreshEnabled() {
+    for (const s of this.sources.values()) this.applyEnabled(s);
+  }
+
+  // ---------- Soundboard: sons tocados direto na call ----------
+  ensureBoard() {
+    if (this.board && this.sources.has(this.board.sourceId)) return this.board;
+    const bus = this.ctx.createGain();
+    const out = this.ctx.createMediaStreamDestination();
+    bus.connect(out);
+    const s = this._addAudioSource({ kind: 'board', label: 'Soundboard', rawStream: out.stream, transmit: true });
+    this.board = { bus, sourceId: s.id };
+    return this.board;
+  }
+
+  playSound(buffer, { local = true } = {}) {
+    const board = this.ensureBoard();
+    const src = this.ctx.createBufferSource();
+    src.buffer = buffer;
+    src.connect(board.bus);
+    if (local) {
+      const g = this.ctx.createGain();
+      g.gain.value = 0.6;
+      src.connect(g).connect(this.ctx.destination);
+    }
+    src.start();
+    return src;
   }
 
   setTransmit(id, on) {
@@ -318,7 +356,7 @@ export class LocalMedia {
   streamsMeta() {
     const meta = {};
     if (this.camera) meta[this.camera.stream.id] = { type: 'camera' };
-    for (const s of this.screens.values()) meta[s.id] = { type: 'screen', name: s.name, surface: s.surface };
+    for (const s of this.screens.values()) meta[s.id] = { type: 'screen', name: s.name, surface: s.surface, coop: s.coop || null };
     for (const a of this.sources.values()) meta[a.stream.id] = { type: 'audio', source: a.kind, screenId: a.screenId, label: a.label };
     return meta;
   }

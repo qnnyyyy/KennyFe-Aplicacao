@@ -3,6 +3,7 @@ import { el, $, icon, avatar, toast, contextMenu, popover, closeMenu, formatTime
 import { api } from './api.js';
 import { emojiPicker, onlyEmoji } from './emoji.js';
 import { openStudio } from './creator.js';
+import { openProfile } from './profile.js';
 
 const QUICK_REACTIONS = ['❤️', '😂', '😍', '🥺', '🔥', '👍'];
 
@@ -204,6 +205,9 @@ export class Chat {
       tools
     );
     onContext(node, (x, y) => this.messageMenu(m, x, y));
+    const showProfile = (e) => m.author && openProfile(this.app, m.author, e.clientX, e.clientY);
+    node.querySelector(':scope > .av')?.addEventListener('click', showProfile);
+    node.querySelector('.msg-head b')?.addEventListener('click', showProfile);
     return node;
   }
 

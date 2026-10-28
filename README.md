@@ -55,6 +55,39 @@ Outras variáveis: `PORT` (padrão 3000), `DATA_DIR` (onde ficam banco e uploads
 - **Tela cheia de verdade:** sem barras nem bordas — só os vídeos. Os controles somem sozinhos quando o mouse para. Duplo clique num bloco = tela cheia só dele. Também tem o **modo cinema** (esconde as barras sem sair da janela).
 - Supressão de ruído, cancelamento de eco, ganho automático, **modo alta fidelidade** (áudio cru estéreo), noise gate com medidor, escolha de microfone/câmera/alto-falante, atalhos (Ctrl+Shift+M muta, Ctrl+Shift+D ensurdece, F tela cheia).
 
+### Perfil
+- Foto, banner (cor ou imagem), "sobre mim", recado, cor do nome e **10 molduras animadas** (Neon, Fogo, Gelo, Ouro, Arco-íris, Tóxico, Galáxia, Pixel, Glitch…).
+- **Jogos favoritos** (até 12) com sugestões, e **"Jogando agora"**: escrito à mão ou detectado sozinho pelo agente Kenfeh Coop. Dá pra esconder isso nas configurações.
+- Clique em qualquer pessoa (lista de membros, chat, call) para abrir o cartão de perfil, com o volume dela se estiver na call.
+
+### Jogos
+- Aba **🎮 Jogos** ao lado do chat, com minijogos multiplayer que rodam no próprio site: **Desenha & Adivinha** (estilo Gartic), **Reflexo**, **Lig 4** e **Jogo da velha**. O grupo inteiro recebe o convite e dá pra jogar durante a call.
+- Catálogo de **jogos grátis** pra jogar com a galera (navegador, Steam, Epic, Riot).
+
+### 🕹️ Modo Jogo Coop (jogar no PC de quem transmite)
+Quem transmite liga o Modo Coop numa tela compartilhada. O amigo clica em **"🎮 Pedir para jogar"**, o host aceita, e o **teclado, o mouse e o controle do amigo passam a funcionar no PC do host**, como se estivessem plugados lá. É ótimo para jogos com coop local (It Takes Two, Cuphead, Overcooked, emuladores…).
+
+- **Host (Windows):**
+  1. No diálogo do Modo Coop, baixe o `Kenfeh-Coop.bat`, abra e digite no site o código de 6 números que aparece.
+  2. Para o controle do amigo virar um **controle de Xbox virtual** (até 4), instale o driver [ViGEmBus](https://github.com/nefarius/ViGEmBus/releases). Teclado e mouse funcionam sem ele.
+  3. Se o navegador perguntar sobre "dispositivos na rede local", permita: é o site conversando com o agente no seu próprio PC.
+- **Convidado:**
+  - Clique no vídeo para capturar o teclado e o mouse. **Esc** solta o mouse e **Ctrl+Shift+Q** sai.
+  - O controle funciona só de estar conectado.
+  - Dá pra escolher mouse **absoluto** (menus, estratégia) ou **relativo** (FPS, câmera).
+- **Segurança:**
+  - O agente só aceita conexões do próprio PC, vindas do site, com o código de pareamento.
+  - Ninguém joga sem o host aprovar.
+  - A tecla Windows é sempre bloqueada.
+  - **Ctrl+Shift+X** corta o controle de todo mundo na hora.
+- **Limites:**
+  - Jogos com anti-cheat (Valorant, CS2, Fortnite…) podem bloquear ou punir input simulado. Use em jogos coop/single-player.
+  - Se o jogo roda como Administrador, rode o agente como Administrador também.
+  - O atraso é o da transmissão (normalmente 50–150 ms).
+
+### Extras de call para gamers
+- **Push-to-talk** (tecla ou botão lateral do mouse), **soundboard** com sons prontos e os seus (todo mundo na call ouve), **ping** de cada pessoa na lista da call, e **gravar clipe** de qualquer bloco (botão direito → Gravar).
+
 ### Chat
 - Mensagens em tempo real, respostas, reações, editar/apagar, "digitando…", **negrito**, *itálico*, `código`, ||spoiler||, links.
 - Emojis, imagens, vídeos, áudios e arquivos (arrastar e soltar ou colar com Ctrl+V).
@@ -80,14 +113,19 @@ server/
   index.js    servidor HTTP/HTTPS, arquivos estáticos e Socket.IO
   db.js       banco SQLite (tabelas criadas/migradas automaticamente)
   auth.js     senhas (scrypt) e sessões
-  routes.js   API REST: contas, grupos, mensagens, uploads, figurinhas
+  routes.js   API REST: contas, perfil, grupos, mensagens, uploads, figurinhas
+  games.js    minijogos multiplayer (o servidor é o juiz)
   hub.js      tempo real: presença, chat e sinalização WebRTC
 public/
   js/main.js          login, grupos e navegação
   js/chat.js          chat, emojis, figurinhas
   js/creator.js       estúdio de figurinhas e GIFs
-  js/settings-ui.js   configurações
+  js/settings-ui.js   configurações e edição de perfil
+  js/profile.js       cartão de perfil
+  js/games.js         aba Jogos (minijogos + catálogo)
   js/call/            chamada: rtc (conexões), media (mic/câmera/telas), audio (volumes),
-                      stage (blocos redimensionáveis), call (controles e menus)
+                      stage (blocos redimensionáveis), call (controles e menus),
+                      coop (Modo Jogo Coop), sounds (soundboard)
+agent/kenfeh-agent.ps1  agente Windows do Modo Coop (SendInput + controle virtual ViGEm)
 data/                 banco e uploads (criado na hora, fora do git)
 ```

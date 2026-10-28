@@ -41,6 +41,8 @@ const DEFAULTS = {
   showSelfPreview: true,
   showNonVideo: true,
   joinSounds: true,
+  pttEnabled: false, // push-to-talk
+  pttKey: 'KeyV',
 };
 
 let current = { ...DEFAULTS, ...store('settings', {}) };

@@ -82,6 +82,17 @@ db.exec(`
   );
 `);
 
+// Migrações: colunas novas do perfil (adicionadas sem perder dados)
+const userCols = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
+const addUserCol = (name, def) => !userCols.includes(name) && db.exec(`ALTER TABLE users ADD COLUMN ${name} ${def}`);
+addUserCol('bio', "TEXT NOT NULL DEFAULT ''");
+addUserCol('banner_color', "TEXT NOT NULL DEFAULT '#2f7bff'");
+addUserCol('banner_url', 'TEXT');
+addUserCol('frame', "TEXT NOT NULL DEFAULT 'none'");
+addUserCol('favorite_games', "TEXT NOT NULL DEFAULT '[]'");
+addUserCol('show_activity', 'INTEGER NOT NULL DEFAULT 1');
+addUserCol('activity', 'TEXT'); // JSON { name, since, source }
+
 // Limpa sessões expiradas a cada inicialização
 db.prepare('DELETE FROM sessions WHERE expires_at < unixepoch()').run();
 

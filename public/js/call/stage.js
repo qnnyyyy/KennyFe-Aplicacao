@@ -6,9 +6,10 @@ import { el, icon, avatar, store, save, onContext } from '../ui.js';
 const MIN_PX = 90;
 
 export class Stage {
-  constructor(root, { onContext: onTileContext } = {}) {
+  constructor(root, { onContext: onTileContext, onCoop } = {}) {
     this.root = root;
     this.onTileContext = onTileContext;
+    this.onCoop = onCoop;
     this.tiles = new Map();
     const saved = store('stage', {});
     this.layout = saved.layout || 'row';
@@ -83,8 +84,11 @@ export class Stage {
     const stats = el('div', { class: 'tile-stats hidden' });
     const actions = el('div', { class: 'tile-actions' });
     const handle = el('div', { class: 'tile-resize', title: 'Redimensionar' });
-    const tileEl = el('div', { class: 'tile', dataset: { key } }, video, avatarWrap, label, stats, actions, handle);
-    const t = { key, el: tileEl, video, avatarWrap, nameEl, badge, muteIc, label, stats, actions, handle, info: { ...info } };
+    const coopBtn = el('button', { class: 'tile-coop hidden', onclick: (e) => { e.stopPropagation(); this.onCoop?.(t); } });
+    const coopHint = el('div', { class: 'tile-coop-hint hidden' }, '🎮 Você está jogando — clique no vídeo para controlar • Esc solta o mouse • Ctrl+Shift+Q sai');
+    const rec = el('div', { class: 'tile-rec' }, '● REC');
+    const tileEl = el('div', { class: 'tile', dataset: { key } }, video, avatarWrap, label, stats, actions, coopBtn, coopHint, rec, handle);
+    const t = { key, el: tileEl, video, avatarWrap, nameEl, badge, muteIc, label, stats, actions, handle, coopBtn, coopHint, info: { ...info } };
 
     const btn = (ic, title, fn) => el('button', { class: 'tile-btn', title, onclick: (e) => { e.stopPropagation(); fn(); } }, icon(ic, 16));
     actions.append(
@@ -98,10 +102,11 @@ export class Stage {
     );
 
     tileEl.addEventListener('dblclick', (e) => {
-      if (e.target.closest('.tile-actions')) return;
+      if (e.target.closest('.tile-actions, .tile-coop') || tileEl.classList.contains('controlling')) return;
       this.fullscreen(key);
     });
-    onContext(tileEl, (x, y) => this.onTileContext?.(t, x, y));
+    // jogando no Modo Coop o botão direito vai para o jogo, não para o menu
+    onContext(tileEl, (x, y) => !tileEl.classList.contains('capturing') && this.onTileContext?.(t, x, y));
 
     // Reordenar: arrasta o nome de um bloco em cima de outro
     label.addEventListener('dragstart', (e) => {
@@ -140,6 +145,14 @@ export class Stage {
     t.badge.textContent = info.kind === 'screen' ? 'AO VIVO' : '';
     t.badge.classList.toggle('hidden', info.kind !== 'screen');
     t.muteIc.classList.toggle('hidden', !info.muted);
+    // Modo Jogo Coop
+    const coop = Boolean(info.coop) && !info.isLocal;
+    t.coopBtn.classList.toggle('hidden', !coop);
+    t.el.classList.toggle('coop', coop);
+    t.el.classList.toggle('controlling', coop && info.coopState === 'playing');
+    t.coopHint.classList.toggle('hidden', !(coop && info.coopState === 'playing'));
+    if (coop) t.coopBtn.textContent = { idle: '🎮 Pedir para jogar', pending: '⏳ Esperando o host…', playing: '✋ Parar de jogar' }[info.coopState] || '🎮 Pedir para jogar';
+    t.badge.textContent = info.kind === 'screen' ? (info.coop ? 'COOP' : 'AO VIVO') : '';
     const fit = this.fit[t.key] || (info.kind === 'screen' ? 'contain' : 'cover');
     t.video.style.objectFit = fit;
     if (hasVideo) {

@@ -6,6 +6,8 @@ import { CallController } from './call/call.js';
 import { openSettings } from './settings-ui.js';
 import { emojiPicker } from './emoji.js';
 import { popover, closeMenu } from './ui.js';
+import { openProfile, activityLine } from './profile.js';
+import { GamesHub } from './games.js';
 
 const GROUP_ICONS = ['🎮', '🍿', '🎬', '🎧', '🔥', '⚡', '🌙', '👾', '🏆', '🐱', '✨', '🍕'];
 
@@ -94,6 +96,7 @@ function start(user) {
   const socket = (app.socket = io({ transports: ['websocket', 'polling'] }));
   app.chat = new Chat(app);
   app.call = new CallController(app);
+  app.games = new GamesHub(app);
 
   socket.on('connect_error', (err) => {
     if (err.message === 'unauthorized') location.reload();
@@ -105,6 +108,17 @@ function start(user) {
     if (!app.groups.has(app.currentGroupId)) app.currentGroupId = groups[0]?.id ?? null;
     renderAll();
     if (app.currentGroupId && app.chat.groupId !== app.currentGroupId) selectGroup(app.currentGroupId);
+    if (app.call.active) app.call.refreshTiles();
+  });
+  socket.on('user:update', ({ user }) => {
+    for (const g of app.groups.values()) {
+      const i = g.members.findIndex((m) => m.id === user.id);
+      if (i >= 0) g.members[i] = { ...g.members[i], ...user };
+    }
+    if (user.id === app.me.id) Object.assign(app.me, user);
+    renderMembers();
+    renderVoiceUsers();
+    renderMeBar();
     if (app.call.active) app.call.refreshTiles();
   });
   socket.on('presence', ({ online }) => {
@@ -187,6 +201,7 @@ function selectGroup(id) {
   $('#app').classList.remove('nav-open');
   renderAll();
   if (id) app.chat.open(id);
+  app.games?.onGroupChanged();
 }
 
 // =====================================================================
@@ -235,8 +250,10 @@ function renderMembers() {
       const on = app.online.has(m.id);
       const row = el('div', { class: `member ${on ? 'online' : 'offline'}` },
         el('div', { class: 'member-av' }, avatar(m, 32), el('span', { class: 'presence' })),
-        el('div', { class: 'member-info' }, el('b', { style: { color: m.color } }, m.displayName, m.role === 'owner' ? ' 👑' : ''), el('small', {}, m.statusText || (on ? 'online' : 'offline')))
+        el('div', { class: 'member-info' }, el('b', { style: { color: m.color } }, m.displayName, m.role === 'owner' ? ' 👑' : ''),
+          activityLine(m, on) ? el('small', { class: 'member-act' }, activityLine(m, on)) : el('small', {}, m.statusText || (on ? 'online' : 'offline')))
       );
+      row.addEventListener('click', (e) => openProfile(app, m, e.clientX, e.clientY));
       onContext(row, (x, y) => userMenu(m, x, y));
       return row;
     })
@@ -272,9 +289,11 @@ function renderVoiceUsers() {
         el('span', { class: 'vu-icons' },
           live ? el('span', { class: 'live-pill' }, live > 1 ? `AO VIVO ×${live}` : 'AO VIVO') : null,
           cam ? icon('video', 14) : null,
+          pingBadge(p.peerId),
           p.state?.deafened ? icon('headphones-off', 14) : p.state?.muted ? icon('mic-off', 14) : null
         )
       );
+      row.addEventListener('click', (e) => openProfile(app, u, e.clientX, e.clientY));
       onContext(row, (x, y) => userMenu(u, x, y));
       return row;
     })
@@ -287,6 +306,12 @@ function renderVoiceUsers() {
     $('#vp-group').textContent = cg ? `${cg.icon} ${cg.name}` : '';
   }
   $('#channel-voice').classList.toggle('active', inCall && app.call.groupId === app.currentGroupId);
+}
+
+function pingBadge(peerId) {
+  const ms = app.call.active ? app.call.remotes.get(peerId)?.ping : null;
+  if (ms == null) return null;
+  return el('span', { class: `ping ${ms < 60 ? 'good' : ms < 140 ? 'ok' : 'bad'}`, title: 'Ping até você' }, `${ms} ms`);
 }
 
 function renderMeBar() {
@@ -451,7 +476,7 @@ function setupStatic() {
   $('#me-deaf').onclick = () => app.call.toggleDeafen();
   setIcon($('#me-settings'), 'settings', 18);
   $('#me-settings').onclick = () => app.openSettings('account');
-  $('#me-card').onclick = () => app.openSettings('account');
+  $('#me-card').onclick = (e) => openProfile(app, app.me, e.clientX, e.clientY);
 
   // botão de menu no celular
   const menuBtn = el('button', { class: 'icon-btn mobile-only', onclick: () => $('#app').classList.toggle('nav-open') }, icon('more', 18));

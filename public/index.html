@@ -113,11 +113,16 @@
         <section class="chat" id="chat">
           <header class="chat-head">
             <div class="chat-title"><span class="chat-icon" id="chat-icon"></span><b id="chat-name"></b></div>
+            <div class="panel-tabs" id="panel-tabs">
+              <button data-tab="chat" class="active">💬 <span>Chat</span></button>
+              <button data-tab="games">🎮 <span>Jogos</span><i class="tab-dot hidden" id="games-dot"></i></button>
+            </div>
             <div class="chat-head-actions">
               <button class="btn btn-call" id="btn-join-call"></button>
               <button class="icon-btn" id="btn-toggle-chat" title="Esconder chat"></button>
             </div>
           </header>
+          <div class="games-view hidden" id="games-view"></div>
           <div class="messages" id="messages"></div>
           <div class="typing" id="typing"></div>
           <div class="composer-wrap">

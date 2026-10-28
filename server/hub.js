@@ -35,6 +35,17 @@ function createHub(io) {
     broadcastMessage(msg) {
       io.to(`group:${msg.groupId}`).emit('chat:message', msg);
     },
+    // Manda o perfil atualizado para quem divide algum grupo com o usuário
+    broadcastUser(userId) {
+      const u = auth.publicUser(db.prepare('SELECT * FROM users WHERE id = ?').get(userId));
+      if (!u) return;
+      const ids = new Set([userId]);
+      db.prepare(
+        `SELECT DISTINCT gm2.user_id AS id FROM group_members gm1 JOIN group_members gm2 ON gm1.group_id = gm2.group_id WHERE gm1.user_id = ?`
+      ).all(userId).forEach((r) => ids.add(r.id));
+      for (const id of ids) for (const s of online.get(id) || []) s.emit('user:update', { user: u });
+    },
+    online,
     leaveGroupRoom(userId, groupId) {
       for (const s of online.get(userId) || []) {
         s.leave(`group:${groupId}`);
@@ -163,7 +174,19 @@ function createHub(io) {
       const set = online.get(userId);
       if (set) {
         set.delete(socket);
-        if (!set.size) online.delete(userId);
+        if (!set.size) {
+          online.delete(userId);
+          // saiu de vez: limpa o "jogando agora" automático (o escrito à mão fica)
+          const row = db.prepare('SELECT activity FROM users WHERE id = ?').get(userId);
+          let act = null;
+          try {
+            act = JSON.parse(row?.activity || 'null');
+          } catch {}
+          if (act && act.source !== 'manual') {
+            db.prepare('UPDATE users SET activity = NULL WHERE id = ?').run(userId);
+            hub.broadcastUser(userId);
+          }
+        }
       }
       emitPresence();
     });

@@ -20,8 +20,19 @@ function verifyPassword(password, stored) {
   return crypto.timingSafeEqual(expected, actual);
 }
 
+const FRAMES = ['none', 'neon', 'fire', 'ice', 'gold', 'rainbow', 'toxic', 'galaxy', 'pixel', 'glitch'];
+
+function parseJson(s, fallback) {
+  try {
+    return s ? JSON.parse(s) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 function publicUser(u) {
   if (!u) return null;
+  const showActivity = u.show_activity === undefined ? true : Boolean(u.show_activity);
   return {
     id: u.id,
     username: u.username,
@@ -29,6 +40,14 @@ function publicUser(u) {
     color: u.color,
     avatarUrl: u.avatar_url,
     statusText: u.status_text,
+    bio: u.bio || '',
+    bannerColor: u.banner_color || '#2f7bff',
+    bannerUrl: u.banner_url || null,
+    frame: FRAMES.includes(u.frame) ? u.frame : 'none',
+    favoriteGames: parseJson(u.favorite_games, []),
+    showActivity,
+    // o "jogando agora" só sai se a pessoa permitir
+    activity: showActivity ? parseJson(u.activity, null) : null,
   };
 }
 
@@ -91,6 +110,7 @@ module.exports = {
   hashPassword,
   verifyPassword,
   publicUser,
+  FRAMES,
   createSession,
   userFromToken,
   tokenFromReq,

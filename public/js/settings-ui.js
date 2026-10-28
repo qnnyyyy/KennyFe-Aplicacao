@@ -1,17 +1,21 @@
 // Tela de configurações: conta, voz e vídeo, transmissão.
-import { el, icon, modal, toast, avatar } from './ui.js';
+import { el, icon, modal, toast, avatar, FRAMES } from './ui.js';
+import { POPULAR_GAMES, gameEmoji } from './gamesdata.js';
+import { profileCard } from './profile.js';
 import { api } from './api.js';
 import { settings, updateSettings, CAMERA_PRESETS, SCREEN_RESOLUTIONS } from './call/settings.js';
 import { listDevices, cleanLabel } from './call/media.js';
+import { keyLabel } from './call/sounds.js';
 
-const PROFILE_COLORS = ['#ff5fa2', '#f72585', '#ff6b6b', '#ffb84c', '#5ce1a0', '#4cc9f0', '#7c8cff', '#a66bff'];
+const PROFILE_COLORS = ['#ff4fa3', '#f72585', '#ff6b6b', '#ffb84c', '#5ce1a0', '#38d6ff', '#3d8bff', '#7b5cff'];
+const BANNER_COLORS = ['#2f7bff', '#7b5cff', '#ff4fa3', '#0f172a', '#14b8a6', '#f97316', '#e11d48', '#22c55e'];
 
 export function openSettings(app, tab = 'account') {
   const nav = el('nav', { class: 'settings-nav' });
   const pane = el('div', { class: 'settings-pane' });
   let cleanup = () => {};
   const tabs = [
-    ['account', 'users', 'Minha conta'],
+    ['account', 'users', 'Meu perfil'],
     ['voice', 'mic', 'Voz e vídeo'],
     ['stream', 'monitor', 'Transmissão'],
     ['keys', 'type', 'Atalhos'],
@@ -43,28 +47,87 @@ function select(label, options, value, onChange) {
 
 function accountPane(app) {
   const me = app.me;
-  let color = me.color;
-  let avatarUrl = me.avatarUrl;
-  const preview = el('div', { class: 'profile-preview' });
+  const draft = {
+    color: me.color,
+    avatarUrl: me.avatarUrl,
+    bannerColor: me.bannerColor || '#2f7bff',
+    bannerUrl: me.bannerUrl,
+    frame: me.frame || 'none',
+    favoriteGames: [...(me.favoriteGames || [])],
+    showActivity: me.showActivity !== false,
+  };
+  const preview = el('div', { class: 'profile-preview-wrap' });
   const name = el('input', { class: 'input', value: me.displayName, maxlength: 32 });
-  const status = el('input', { class: 'input', value: me.statusText || '', maxlength: 80, placeholder: 'Ex.: jogando Valorant 🎮' });
-  const renderPreview = () => preview.replaceChildren(avatar({ ...me, color, avatarUrl, displayName: name.value }, 84), el('div', {}, el('b', {}, name.value || me.username), el('small', {}, '@' + me.username), el('small', { class: 'muted' }, status.value)));
-  name.addEventListener('input', renderPreview);
-  status.addEventListener('input', renderPreview);
-  renderPreview();
-  const colors = el('div', { class: 'color-row' }, PROFILE_COLORS.map((c) => el('button', { class: `swatch ${c === color ? 'active' : ''}`, style: { background: c }, onclick: (e) => { color = c; colors.querySelectorAll('.swatch').forEach((s) => s.classList.remove('active')); e.currentTarget.classList.add('active'); renderPreview(); } })));
-  const fileInput = el('input', { type: 'file', accept: 'image/*', hidden: true });
-  fileInput.addEventListener('change', async () => {
-    const f = fileInput.files[0];
-    if (!f) return;
+  const status = el('input', { class: 'input', value: me.statusText || '', maxlength: 80, placeholder: 'Ex.: bora de ranked? 🎮' });
+  const bio = el('textarea', { class: 'input', rows: 3, maxlength: 300, placeholder: 'Conta um pouco sobre você, seu main, seu horário de jogo…' }, me.bio || '');
+  const current = () => ({ ...me, ...draft, displayName: name.value || me.username, statusText: status.value, bio: bio.value });
+  const renderPreview = () => preview.replaceChildren(profileCard(app, current(), { preview: true }));
+  [name, status, bio].forEach((i) => i.addEventListener('input', renderPreview));
+
+  const upload = (purpose, onDone) => {
+    const input = el('input', { type: 'file', accept: 'image/*' });
+    input.addEventListener('change', async () => {
+      const f = input.files[0];
+      if (!f) return;
+      try {
+        onDone((await api.upload(f, purpose)).url);
+        renderPreview();
+      } catch (err) {
+        toast(err.message, 'error');
+      }
+    });
+    input.click();
+  };
+
+  const swatches = (list, key) => {
+    const row = el('div', { class: 'color-row' });
+    const paint = () => row.replaceChildren(
+      ...list.map((c) => el('button', { class: `swatch ${c === draft[key] ? 'active' : ''}`, style: { background: c }, onclick: () => { draft[key] = c; paint(); renderPreview(); } })),
+      el('input', { type: 'color', value: draft[key], oninput: (e) => { draft[key] = e.target.value; renderPreview(); } })
+    );
+    paint();
+    return row;
+  };
+
+  // Molduras
+  const frames = el('div', { class: 'frame-grid' });
+  const paintFrames = () => frames.replaceChildren(
+    ...FRAMES.map(([id, label]) => el('button', { class: `frame-opt ${draft.frame === id ? 'active' : ''}`, onclick: () => { draft.frame = id; paintFrames(); renderPreview(); } },
+      avatar({ ...current(), frame: id }, 52), el('small', {}, label)))
+  );
+  paintFrames();
+
+  // Jogos favoritos
+  const chips = el('div', { class: 'chips' });
+  const gameInput = el('input', { class: 'input', placeholder: 'Digite um jogo e aperte Enter', list: 'kf-games-list', maxlength: 40 });
+  const datalist = el('datalist', { id: 'kf-games-list' }, POPULAR_GAMES.map((g) => el('option', { value: g })));
+  const paintChips = () => chips.replaceChildren(
+    ...draft.favoriteGames.map((g) => el('span', { class: 'chip game-chip' }, `${gameEmoji(g)} ${g}`, el('button', { title: 'Remover', onclick: () => { draft.favoriteGames = draft.favoriteGames.filter((x) => x !== g); paintChips(); renderPreview(); } }, '×'))),
+    ...(draft.favoriteGames.length ? [] : [el('span', { class: 'muted small' }, 'Nenhum ainda.')])
+  );
+  const addGame = () => {
+    const g = gameInput.value.trim();
+    if (!g || draft.favoriteGames.includes(g) || draft.favoriteGames.length >= 12) return;
+    draft.favoriteGames.push(g);
+    gameInput.value = '';
+    paintChips();
+    renderPreview();
+  };
+  gameInput.addEventListener('keydown', (e) => e.key === 'Enter' && (e.preventDefault(), addGame()));
+  gameInput.addEventListener('change', () => POPULAR_GAMES.includes(gameInput.value) && addGame());
+  paintChips();
+
+  // Jogando agora (manual)
+  const playing = el('input', { class: 'input', placeholder: 'Ex.: Valorant', list: 'kf-games-list', value: me.activity?.source === 'manual' ? me.activity.name : '' });
+  const setPlaying = async (nameVal) => {
     try {
-      const up = await api.upload(f, 'avatar');
-      avatarUrl = up.url;
-      renderPreview();
+      await api.post('/me/activity', { name: nameVal, source: 'manual' });
+      toast(nameVal ? `Status: jogando ${nameVal} 🎮` : 'Status de jogo removido.', 'success');
     } catch (err) {
       toast(err.message, 'error');
     }
-  });
+  };
+
   const curPass = el('input', { class: 'input', type: 'password', placeholder: 'Senha atual', autocomplete: 'current-password' });
   const newPass = el('input', { class: 'input', type: 'password', placeholder: 'Nova senha (mín. 6)', autocomplete: 'new-password' });
 
@@ -72,7 +135,7 @@ function accountPane(app) {
     class: 'btn btn-primary',
     onclick: async () => {
       try {
-        const body = { displayName: name.value, color, statusText: status.value, avatarUrl: avatarUrl || null };
+        const body = { displayName: name.value, statusText: status.value, bio: bio.value, ...draft, avatarUrl: draft.avatarUrl || null, bannerUrl: draft.bannerUrl || null };
         if (newPass.value) Object.assign(body, { currentPassword: curPass.value, newPassword: newPass.value });
         const { user } = await api.patch('/me', body);
         app.setMe(user);
@@ -82,23 +145,40 @@ function accountPane(app) {
         toast(err.message, 'error');
       }
     },
-  }, 'Salvar alterações');
+  }, 'Salvar perfil');
 
+  renderPreview();
   return {
-    node: el('div', {},
-      el('h3', {}, 'Minha conta'),
-      preview,
-      el('div', { class: 'row-actions' },
-        el('button', { class: 'btn btn-ghost btn-sm', onclick: () => fileInput.click() }, 'Trocar foto'),
-        avatarUrl ? el('button', { class: 'btn btn-ghost btn-sm', onclick: () => { avatarUrl = null; renderPreview(); } }, 'Remover foto') : null,
-        fileInput
+    node: el('div', { class: 'account-pane' },
+      el('h3', {}, 'Meu perfil'),
+      el('div', { class: 'account-grid' },
+        el('div', { class: 'account-form' },
+          el('div', { class: 'row-actions' },
+            el('button', { class: 'btn btn-ghost btn-sm', onclick: () => upload('avatar', (u) => (draft.avatarUrl = u)) }, '📷 Trocar foto'),
+            el('button', { class: 'btn btn-ghost btn-sm', onclick: () => { draft.avatarUrl = null; renderPreview(); } }, 'Remover foto'),
+            el('button', { class: 'btn btn-ghost btn-sm', onclick: () => upload('avatar', (u) => (draft.bannerUrl = u)) }, '🖼️ Imagem do banner'),
+            el('button', { class: 'btn btn-ghost btn-sm', onclick: () => { draft.bannerUrl = null; renderPreview(); } }, 'Tirar banner')
+          ),
+          el('label', { class: 'field' }, el('span', {}, 'Nome de exibição'), name),
+          el('label', { class: 'field' }, el('span', {}, 'Recado'), status),
+          el('label', { class: 'field' }, el('span', {}, 'Sobre mim'), bio),
+          el('div', { class: 'grid-2' },
+            el('div', { class: 'field' }, el('span', {}, 'Cor do nome/avatar'), swatches(PROFILE_COLORS, 'color')),
+            el('div', { class: 'field' }, el('span', {}, 'Cor do banner'), swatches(BANNER_COLORS, 'bannerColor'))
+          ),
+          el('div', { class: 'field' }, el('span', {}, 'Moldura do perfil'), frames),
+          el('div', { class: 'field' }, el('span', {}, 'Jogos favoritos (até 12)'), gameInput, datalist, chips),
+          el('h4', {}, '🎮 Jogando agora'),
+          sw('Mostrar o que estou jogando', 'Aparece no seu perfil e na lista de membros. O agente do PC detecta sozinho (veja "Jogo Coop"), ou você escreve abaixo.', draft.showActivity, (v) => { draft.showActivity = v; renderPreview(); }),
+          el('div', { class: 'inline-form' }, playing,
+            el('button', { class: 'btn btn-ghost btn-sm', onclick: () => setPlaying(playing.value.trim()) }, 'Definir'),
+            el('button', { class: 'btn btn-ghost btn-sm', onclick: () => { playing.value = ''; setPlaying(''); } }, 'Limpar')),
+          el('h4', {}, 'Trocar senha'),
+          el('div', { class: 'grid-2' }, curPass, newPass)
+        ),
+        el('div', { class: 'account-side' }, el('span', { class: 'muted small' }, 'Prévia'), preview)
       ),
-      el('label', { class: 'field' }, el('span', {}, 'Nome de exibição'), name),
-      el('label', { class: 'field' }, el('span', {}, 'Recado'), status),
-      el('div', { class: 'field' }, el('span', {}, 'Cor do perfil'), colors),
-      el('h4', {}, 'Trocar senha'),
-      el('div', { class: 'grid-2' }, curPass, newPass),
-      el('div', { class: 'row-actions end' }, saveBtn)
+      el('div', { class: 'row-actions end sticky-save' }, saveBtn)
     ),
   };
 }
@@ -195,6 +275,9 @@ function voicePane(app) {
       sw('Espelhar minha prévia', null, st.mirrorCam, (v) => update({ mirrorCam: v })),
       camPreview,
       camBtn,
+      el('h4', {}, 'Push-to-talk (apertar para falar)'),
+      sw('Ativar push-to-talk', 'O microfone só transmite enquanto você segura a tecla. Funciona com a janela do site em foco (limite do navegador).', st.pttEnabled, (v) => update({ pttEnabled: v })),
+      pttPicker(),
       el('h4', {}, 'Sons'),
       sw('Sons de entrar/sair da call', null, st.joinSounds, (v) => update({ joinSounds: v }))
     );
@@ -209,6 +292,37 @@ function voicePane(app) {
       actx?.close();
     },
   };
+}
+
+function pttPicker() {
+  const btn = el('button', { class: 'btn btn-ghost btn-sm' });
+  const paint = () => (btn.textContent = `Tecla: ${keyLabel(settings().pttKey)} — clique para trocar`);
+  paint();
+  btn.addEventListener('click', () => {
+    btn.textContent = 'Aperte uma tecla ou botão lateral do mouse…';
+    const done = (code) => {
+      document.removeEventListener('keydown', onKey, true);
+      document.removeEventListener('pointerdown', onPtr, true);
+      if (code) updateSettings({ pttKey: code });
+      paint();
+    };
+    const onKey = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      done(e.code === 'Escape' ? null : e.code);
+    };
+    const onPtr = (e) => {
+      if (e.button > 2) {
+        e.preventDefault();
+        done(`Mouse${e.button}`);
+      }
+    };
+    setTimeout(() => {
+      document.addEventListener('keydown', onKey, true);
+      document.addEventListener('pointerdown', onPtr, true);
+    }, 50);
+  });
+  return el('div', { class: 'row-actions' }, btn);
 }
 
 function streamPane() {
@@ -245,6 +359,9 @@ function keysPane() {
       el('h3', {}, 'Atalhos'),
       row('Ctrl + Shift + M', 'Mutar / desmutar'),
       row('Ctrl + Shift + D', 'Ensurdecer'),
+      row('Tecla do push-to-talk', 'Falar enquanto segura (configure em Voz e vídeo)'),
+      row('Ctrl + Shift + X', 'Modo Coop: cortar o controle de todos os convidados'),
+      row('Ctrl + Shift + Q', 'Modo Coop: parar de jogar no PC do amigo'),
       row('F', 'Tela cheia da call (fora da caixa de texto)'),
       row('Esc', 'Sair da tela cheia / fechar janelas'),
       row('Duplo clique num bloco', 'Tela cheia só daquele bloco'),

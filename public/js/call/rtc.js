@@ -78,6 +78,18 @@ class Peer {
     this.lastStats = new Map();
 
     const pc = (this.pc = new RTCPeerConnection({ iceServers: mgr.iceServers, bundlePolicy: 'max-bundle' }));
+    // canal de dados direto (P2P): input do Modo Coop, pings etc.
+    this.dc = pc.createDataChannel('kf', { negotiated: true, id: 0, ordered: true });
+    this.dc.onmessage = (e) => {
+      let msg;
+      try {
+        msg = JSON.parse(e.data);
+      } catch {
+        return;
+      }
+      mgr.onData?.(peerId, msg);
+    };
+    this.dc.onopen = () => mgr.onDataOpen?.(peerId);
 
     pc.onnegotiationneeded = async () => {
       try {
@@ -221,6 +233,15 @@ class Peer {
     return out;
   }
 
+  async rtt() {
+    const report = await this.pc.getStats();
+    let rtt = null;
+    report.forEach((s) => {
+      if (s.type === 'candidate-pair' && s.state === 'succeeded' && s.nominated && s.currentRoundTripTime != null) rtt = s.currentRoundTripTime;
+    });
+    return rtt != null ? Math.round(rtt * 1000) : null;
+  }
+
   close() {
     try {
       this.pc.close();
@@ -229,7 +250,9 @@ class Peer {
 }
 
 export class PeerManager {
-  constructor({ socket, iceServers, settings, onTrack, onTrackRemoved, onConnState }) {
+  constructor({ socket, iceServers, settings, onTrack, onTrackRemoved, onConnState, onData, onDataOpen }) {
+    this.onData = onData;
+    this.onDataOpen = onDataOpen;
     this.socket = socket;
     this.iceServers = iceServers;
     this.settings = settings;
@@ -282,6 +305,17 @@ export class PeerManager {
   // Força nova negociação (ex.: trocou o codec preferido)
   renegotiateAll() {
     for (const p of this.peers.values()) p.pc.onnegotiationneeded?.();
+  }
+
+  sendData(peerId, obj) {
+    const dc = this.peers.get(peerId)?.dc;
+    if (!dc || dc.readyState !== 'open') return false;
+    dc.send(JSON.stringify(obj));
+    return true;
+  }
+
+  async rtt(peerId) {
+    return this.peers.get(peerId)?.rtt() ?? null;
   }
 
   async stats(peerId) {

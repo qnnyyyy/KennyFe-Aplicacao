@@ -10,6 +10,7 @@ const { DB_PATH, DATA_DIR, UPLOAD_DIR } = require('./db');
 const auth = require('./auth');
 const { buildRouter } = require('./routes');
 const { createHub } = require('./hub');
+const { attachGames } = require('./games');
 
 const PORT = Number(process.env.PORT) || 3000;
 const USE_HTTPS = process.argv.includes('--https') || process.env.HTTPS === '1';
@@ -50,11 +51,29 @@ async function main() {
   const server = USE_HTTPS ? https.createServer(await loadCertificate(), app) : http.createServer(app);
   const io = new Server(server, { maxHttpBufferSize: 1e6 });
   const hub = createHub(io);
+  attachGames(io, hub);
 
   app.use('/api', buildRouter(io, hub));
 
   // Arquivos enviados só para quem está logado
   app.use('/uploads', auth.requireAuth, express.static(UPLOAD_DIR, { maxAge: '30d', immutable: true }));
+  // Agente do Modo Coop (Windows): o .bat baixa o script e já libera este site
+  app.get('/agent/kenfeh-agent.ps1', (_req, res) => res.type('text/plain').sendFile(path.join(__dirname, '..', 'agent', 'kenfeh-agent.ps1')));
+  app.get('/agent/Kenfeh-Coop.bat', (req, res) => {
+    const origin = `${req.protocol}://${req.get('host')}`.replace(/[^\w:/.\-]/g, '');
+    const bat = [
+      '@echo off',
+      'title Kenfeh Coop',
+      'if not exist "%LOCALAPPDATA%\\Kenfeh" mkdir "%LOCALAPPDATA%\\Kenfeh"',
+      `echo Baixando o agente de ${origin} ...`,
+      `powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-WebRequest -UseBasicParsing '${origin}/agent/kenfeh-agent.ps1' -OutFile (Join-Path $env:LOCALAPPDATA 'Kenfeh\\kenfeh-agent.ps1')"`,
+      `powershell -NoProfile -ExecutionPolicy Bypass -File "%LOCALAPPDATA%\\Kenfeh\\kenfeh-agent.ps1" -Origins "${origin}"`,
+      'pause',
+      '',
+    ].join('\r\n');
+    res.setHeader('Content-Disposition', 'attachment; filename="Kenfeh-Coop.bat"');
+    res.type('application/octet-stream').send(bat);
+  });
   app.get('/vendor/gifenc.js', (_req, res) => res.sendFile(require.resolve('gifenc/dist/gifenc.esm.js')));
   app.use(express.static(path.join(__dirname, '..', 'public'), { extensions: ['html'] }));
   app.get('*', (_req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'index.html')));

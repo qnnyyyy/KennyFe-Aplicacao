@@ -91,11 +91,36 @@ export function setIcon(node, name, size) {
   node.replaceChildren(icon(name, size));
 }
 
-export function avatar(user, size = 36) {
-  const a = el('div', { class: 'avatar', style: { width: size + 'px', height: size + 'px', background: user?.color || '#a66bff', fontSize: Math.round(size * 0.42) + 'px' } });
-  if (user?.avatarUrl) a.append(el('img', { src: user.avatarUrl, alt: '' }));
-  else a.textContent = (user?.displayName || user?.username || '?').trim().charAt(0).toUpperCase();
-  return a;
+// Avatar com moldura opcional (as molduras são CSS animado em volta da foto)
+export function avatar(user, size = 36, { frame = true } = {}) {
+  const inner = el('div', { class: 'avatar', style: { background: user?.color || '#7b5cff', fontSize: Math.round(size * 0.42) + 'px' } });
+  if (user?.avatarUrl) inner.append(el('img', { src: user.avatarUrl, alt: '' }));
+  else inner.textContent = (user?.displayName || user?.username || '?').trim().charAt(0).toUpperCase();
+  const f = frame && user?.frame && user.frame !== 'none' ? user.frame : null;
+  const wrap = el('div', { class: `av ${f ? 'framed frame-' + f : ''}`, style: { width: size + 'px', height: size + 'px' } }, inner);
+  wrap.style.setProperty('--fw', Math.max(2, Math.round(size * 0.075)) + 'px');
+  return wrap;
+}
+
+export const FRAMES = [
+  ['none', 'Sem moldura'],
+  ['neon', 'Neon'],
+  ['fire', 'Fogo'],
+  ['ice', 'Gelo'],
+  ['gold', 'Ouro'],
+  ['rainbow', 'Arco-íris'],
+  ['toxic', 'Tóxico'],
+  ['galaxy', 'Galáxia'],
+  ['pixel', 'Pixel'],
+  ['glitch', 'Glitch'],
+];
+
+export function timeAgo(sec) {
+  const d = Math.max(0, Math.floor(Date.now() / 1000 - sec));
+  if (d < 60) return 'agora mesmo';
+  if (d < 3600) return `há ${Math.floor(d / 60)} min`;
+  if (d < 86400) return `há ${Math.floor(d / 3600)} h ${Math.floor((d % 3600) / 60)} min`;
+  return `há ${Math.floor(d / 86400)} dia(s)`;
 }
 
 export function escapeHtml(s) {
@@ -179,9 +204,9 @@ export function closeMenu() {
  * items: [{ label, icon, onClick, danger, checked } | { type:'sep' } | { type:'title', label }
  *        | { type:'slider', label, min, max, value, step, format, onInput } | { type:'custom', node }]
  */
-export function contextMenu(x, y, items) {
+export function contextMenu(x, y, items, className = '') {
   closeMenu();
-  const menu = el('div', { class: 'ctx-menu glass', oncontextmenu: (e) => e.preventDefault() });
+  const menu = el('div', { class: `ctx-menu glass ${className}`, oncontextmenu: (e) => e.preventDefault() });
   for (const it of items) {
     if (!it) continue;
     if (it.type === 'sep') menu.append(el('div', { class: 'ctx-sep' }));

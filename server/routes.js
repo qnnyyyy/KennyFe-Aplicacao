@@ -16,6 +16,12 @@ const ALLOWED_MIME = {
   'audio/mpeg': '.mp3',
   'audio/ogg': '.ogg',
   'audio/webm': '.weba',
+  'audio/wav': '.wav',
+  'audio/x-wav': '.wav',
+  'audio/wave': '.wav',
+  'audio/mp4': '.m4a',
+  'audio/x-m4a': '.m4a',
+  'audio/aac': '.aac',
   'application/pdf': '.pdf',
   'application/zip': '.zip',
   'text/plain': '.txt',
@@ -151,7 +157,7 @@ function buildRouter(io, hub) {
   };
 
   // ---------- Conta ----------
-  r.post('/auth/register', rateLimit(5, 60 * 60e3), (req, res) => {
+  r.post('/auth/register', rateLimit(10, 60 * 60e3), (req, res) => {
     const required = process.env.REGISTER_CODE;
     if (required && String(req.body.accessCode || '').trim() !== required)
       return res.status(403).json({ error: 'Código de acesso inválido. Peça pra quem administra o site.' });
@@ -212,7 +218,18 @@ function buildRouter(io, hub) {
     const color = /^#[0-9a-f]{6}$/i.test(req.body.color || '') ? req.body.color : u.color;
     const statusText = req.body.statusText !== undefined ? String(req.body.statusText).slice(0, 80) : u.status_text;
     const avatarUrl = req.body.avatarUrl !== undefined ? (String(req.body.avatarUrl).startsWith('/uploads/') ? req.body.avatarUrl : null) : u.avatar_url;
-    db.prepare('UPDATE users SET display_name = ?, color = ?, status_text = ?, avatar_url = ? WHERE id = ?').run(displayName, color, statusText, avatarUrl, u.id);
+    const bio = req.body.bio !== undefined ? String(req.body.bio).slice(0, 300) : u.bio;
+    const bannerColor = /^#[0-9a-f]{6}$/i.test(req.body.bannerColor || '') ? req.body.bannerColor : u.banner_color;
+    const bannerUrl = req.body.bannerUrl !== undefined ? (String(req.body.bannerUrl || '').startsWith('/uploads/') ? req.body.bannerUrl : null) : u.banner_url;
+    const frame = auth.FRAMES.includes(req.body.frame) ? req.body.frame : u.frame;
+    const favoriteGames = Array.isArray(req.body.favoriteGames)
+      ? JSON.stringify([...new Set(req.body.favoriteGames.map((g) => String(g).trim().slice(0, 40)).filter(Boolean))].slice(0, 12))
+      : u.favorite_games;
+    const showActivity = req.body.showActivity !== undefined ? (req.body.showActivity ? 1 : 0) : u.show_activity;
+    db.prepare(
+      `UPDATE users SET display_name = ?, color = ?, status_text = ?, avatar_url = ?, bio = ?, banner_color = ?, banner_url = ?,
+       frame = ?, favorite_games = ?, show_activity = ? WHERE id = ?`
+    ).run(displayName, color, statusText, avatarUrl, bio, bannerColor, bannerUrl, frame, favoriteGames, showActivity, u.id);
     if (req.body.newPassword) {
       if (!auth.verifyPassword(String(req.body.currentPassword || ''), u.password_hash))
         return res.status(400).json({ error: 'Senha atual incorreta.' });
@@ -224,6 +241,25 @@ function buildRouter(io, hub) {
     const groupIds = db.prepare('SELECT group_id FROM group_members WHERE user_id = ?').all(u.id);
     groupIds.forEach(({ group_id }) => notifyGroup(group_id));
     res.json({ user: auth.publicUser(fresh) });
+  });
+
+  // "Jogando agora": definido à mão, pelo agente do PC ou ao transmitir um jogo
+  r.post('/me/activity', (req, res) => {
+    const name = String(req.body.name || '').trim().slice(0, 60);
+    const source = ['manual', 'agent', 'stream'].includes(req.body.source) ? req.body.source : 'manual';
+    const current = (() => {
+      try {
+        return JSON.parse(req.user.activity || 'null');
+      } catch {
+        return null;
+      }
+    })();
+    // o agente não apaga um status escrito à mão
+    if (!name && source === 'agent' && current?.source === 'manual') return res.json({ ok: true });
+    const activity = name ? JSON.stringify({ name, since: current?.name === name ? current.since : Math.floor(Date.now() / 1000), source }) : null;
+    db.prepare('UPDATE users SET activity = ? WHERE id = ?').run(activity, req.user.id);
+    hub.broadcastUser(req.user.id);
+    res.json({ ok: true });
   });
 
   // ---------- Grupos ----------
@@ -321,7 +357,7 @@ function buildRouter(io, hub) {
     const url = '/uploads/' + req.file.filename;
     const purpose = String(req.body.purpose || 'file');
     let sticker = null;
-    if (purpose === 'sticker' || purpose === 'gif') {
+    if (purpose === 'sticker' || purpose === 'gif' || purpose === 'sound') {
       const info = db
         .prepare('INSERT INTO stickers (owner_id, kind, url, name) VALUES (?, ?, ?, ?)')
         .run(req.user.id, purpose, url, String(req.body.name || '').slice(0, 40));

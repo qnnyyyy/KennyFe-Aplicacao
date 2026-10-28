@@ -6,6 +6,8 @@ import { LocalMedia, listDevices, cleanLabel } from './media.js';
 import { AudioOut } from './audio.js';
 import { Stage } from './stage.js';
 import { settings, updateSettings, onSettings, CAMERA_PRESETS, SCREEN_RESOLUTIONS } from './settings.js';
+import { CoopController } from './coop.js';
+import { BUILTIN_SOUNDS, renderSound, keyLabel } from './sounds.js';
 
 const pct = (v) => `${Math.round(v * 100)}%`;
 
@@ -19,7 +21,10 @@ export class CallController {
     this.muted = false;
     this.deafened = false;
     this.wrap = $('#stage-wrap');
-    this.stage = new Stage($('#stage'), { onContext: (t, x, y) => this.tileMenu(t, x, y) });
+    this.stage = new Stage($('#stage'), { onContext: (t, x, y) => this.tileMenu(t, x, y), onCoop: (t) => this.coop.request(t.info.peerId, t.info.screenId) });
+    this.coop = new CoopController(this);
+    this.recorders = new Map();
+    this.soundCache = new Map();
     this.controls = $('#call-controls');
 
     const s = this.socket;
@@ -79,6 +84,7 @@ export class CallController {
       onTrack: (peerId, track, stream) => this.onRemoteTrack(peerId, track, stream),
       onTrackRemoved: (peerId, track, stream) => this.onRemoteTrackRemoved(peerId, track, stream),
       onConnState: (peerId, st) => this.onConnState(peerId, st),
+      onData: (peerId, m) => this.coop.onData(peerId, m),
     });
 
     this.media = new LocalMedia({
@@ -110,6 +116,7 @@ export class CallController {
     if (settings().joinSounds) sfx('join');
     this.stage.showNonVideo = settings().showNonVideo;
     this.statsTimer = setInterval(() => this.updateStats(), 1000);
+    this.pingTimer = setInterval(() => this.updatePings(), 3000);
     this.app.onCallChanged();
     this.renderControls();
     this.refreshTiles();
@@ -133,9 +140,13 @@ export class CallController {
 
   leave() {
     if (!this.active) return;
+    this.coop.stopControl(false);
+    this.coop.stopHosting();
+    for (const k of [...this.recorders.keys()]) this.stopRecording(k);
     this.active = false;
     this.socket.emit('call:leave');
     clearInterval(this.statsTimer);
+    clearInterval(this.pingTimer);
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     document.body.classList.remove('cinema');
     this.pm.closeAll();
@@ -149,6 +160,7 @@ export class CallController {
   }
 
   dropPeer(peerId, refresh = true) {
+    this.coop.onPeerLeft(peerId);
     this.pm?.removePeer(peerId);
     this.audioOut?.detachPeer(peerId);
     this.remotes.delete(peerId);
@@ -161,6 +173,7 @@ export class CallController {
 
   localChanged() {
     if (!this.active) return;
+    this.coop.onScreensChanged();
     this.socket.emit('call:state', { state: this.localState() });
     this.refreshTiles();
     this.renderControls();
@@ -179,7 +192,7 @@ export class CallController {
         userId: r.userId,
         track,
         stream,
-        kind: meta?.source === 'screen' ? 'screen' : 'mic',
+        kind: !meta || meta.source === 'mic' ? 'mic' : 'screen',
         screenId: meta?.screenId || null,
       });
     }
@@ -200,7 +213,7 @@ export class CallController {
     if (!r) return;
     for (const [streamId, stream] of r.streams) {
       const meta = r.state.streams?.[streamId];
-      for (const t of stream.getAudioTracks()) this.audioOut.reclassify(t.id, meta?.source === 'screen' ? 'screen' : 'mic', meta?.screenId || null);
+      for (const t of stream.getAudioTracks()) this.audioOut.reclassify(t.id, !meta || meta.source === 'mic' ? 'mic' : 'screen', meta?.screenId || null);
     }
   }
 
@@ -250,11 +263,17 @@ export class CallController {
       else want.set(`${base}:avatar`, { kind: 'avatar', peerId, user, name: user.displayName, muted });
       for (const [id, info] of Object.entries(meta)) {
         if (info.type !== 'screen' || !hasLiveVideo(r.streams.get(id))) continue;
-        want.set(`${base}:s:${id}`, { kind: 'screen', peerId, user, name: `${user.displayName} — ${info.name || 'Tela'}`, stream: r.streams.get(id), screenId: id, userId: r.userId });
+        want.set(`${base}:s:${id}`, { kind: 'screen', peerId, user, name: `${user.displayName} — ${info.name || 'Tela'}`, stream: r.streams.get(id), screenId: id, userId: r.userId, coop: info.coop || null, coopState: info.coop ? this.coop.tileState(peerId, id) : null });
       }
     }
     for (const key of [...this.stage.tiles.keys()]) if (!want.has(key)) this.stage.remove(key);
     for (const [key, info] of want) this.stage.upsert(key, info);
+    // tile que o convidado está controlando no Modo Coop
+    const c = this.coop.controlling;
+    const ctrlTile = c && [...this.stage.tiles.values()].find((t) => t.info.peerId === c.peerId && t.info.screenId === c.screenId && t.info.coop);
+    if (c && !ctrlTile && !this.remotes.get(c.peerId)?.state.streams?.[c.screenId]?.coop) this.coop.stopControl(false);
+    else this.coop.bindTile(ctrlTile || null);
+    for (const t of this.stage.tiles.values()) t.el.classList.toggle('recording', this.recorders.has(t.key));
     $('#stage-title').textContent = this.app.group(this.groupId)?.name || '';
   }
 
@@ -357,6 +376,11 @@ export class CallController {
       if (first) this.media.setVolume(first.id, st.micVolume);
     }
     if ('outputDeviceId' in patch) this.audioOut.setOutputDevice(st.outputDeviceId);
+    if ('pttEnabled' in patch || 'pttKey' in patch) {
+      this.media.pttDown = false;
+      this.media.refreshEnabled();
+      this.mixerRefresh?.();
+    }
     if (('camQuality' in patch || 'camDeviceId' in patch) && this.media.camera) this.media.startCamera().catch((e) => toast(e.message, 'error'));
     if ('codec' in patch) this.pm.renegotiateAll();
     if ('showNonVideo' in patch) {
@@ -408,6 +432,11 @@ export class CallController {
         { label: 'Estatísticas de qualidade', icon: 'activity', onClick: () => this.stage.toggleStats(key) && this.updateStats() }
       );
     }
+    if (hasVideo && info.stream) {
+      const rec = this.recorders.has(key);
+      items.push({ label: rec ? '⏹ Parar gravação e baixar' : '⏺ Gravar clipe deste bloco', onClick: () => (rec ? this.stopRecording(key) : this.startRecording(t)) });
+    }
+    if (info.isLocal && info.kind === 'screen') items.push({ label: '🕹️ Modo Jogo Coop…', onClick: () => this.coop.openHostDialog() });
     items.push({ label: 'Ocultar este bloco', icon: 'x', onClick: () => this.stage.hide(key) });
     contextMenu(x, y, items);
   }
@@ -430,7 +459,9 @@ export class CallController {
         split(b(m.camera ? 'video' : 'video-off', 'Câmera', () => this.toggleCamera(), m.camera ? 'on' : ''), (a) => this.cameraPopover(a)),
         el('button', { class: `cc-btn ${screens ? 'on' : ''}`, title: 'Compartilhar tela (pode ser mais de uma)', onclick: (e) => (screens ? this.screensPopover(e.currentTarget) : this.shareDialog()) },
           icon('monitor-up', 22), screens ? el('span', { class: 'cc-count' }, screens) : null),
-        b('sliders', 'Mixer: escolher quais áudios transmitir', () => this.openMixer())
+        b('sliders', 'Mixer: escolher quais áudios transmitir', () => this.openMixer()),
+        el('button', { class: `cc-btn ${this.coop.hosting ? 'on' : ''}`, title: 'Modo Jogo Coop: deixar amigos jogarem no seu PC', onclick: () => this.coop.openHostDialog() }, el('span', { class: 'cc-emoji' }, '🕹️')),
+        el('button', { class: 'cc-btn', title: 'Soundboard', onclick: (e) => this.soundboard(e.currentTarget) }, el('span', { class: 'cc-emoji' }, '📣'))
       ),
       el('div', { class: 'cc-group' },
         b(this.layoutIcon(), 'Layout', (e) => this.layoutPopover(e.currentTarget)),
@@ -618,13 +649,13 @@ export class CallController {
                 if (s === this.media.mics[0]) updateSettings({ micVolume: vol.value / 100 });
               });
               const isMic = s.kind === 'mic';
-              const removeBtn = isMic
+              const removeBtn = isMic || s.kind === 'board'
                 ? el('button', { class: 'icon-btn sm', title: 'Remover esta fonte', onclick: () => this.media.removeSource(s.id) }, icon('x', 16))
                 : el('button', { class: 'icon-btn sm', title: 'Parar esta transmissão', onclick: () => this.media.stopScreen(s.screenId) }, icon('stop', 16));
               return el('div', { class: `mixer-row ${s.transmit ? '' : 'off'}` },
-                el('div', { class: 'mixer-ic' }, icon(isMic ? 'mic' : 'monitor', 18)),
+                el('div', { class: 'mixer-ic' }, icon(isMic ? 'mic' : s.kind === 'board' ? 'volume' : 'monitor', 18)),
                 el('div', { class: 'mixer-main' },
-                  el('div', { class: 'mixer-name' }, el('b', {}, s.label), el('small', {}, isMic ? (this.muted ? 'Microfone • você está mutado' : 'Microfone') : 'Áudio da transmissão')),
+                  el('div', { class: 'mixer-name' }, el('b', {}, s.label), el('small', {}, isMic ? (this.muted ? 'Microfone • você está mutado' : settings().pttEnabled ? `Microfone • push-to-talk (${keyLabel(settings().pttKey)})` : 'Microfone') : s.kind === 'board' ? 'Sons do soundboard' : 'Áudio da transmissão')),
                   meter,
                   el('div', { class: 'mixer-vol-row' }, icon('volume', 14), vol, volOut)
                 ),
@@ -673,6 +704,111 @@ export class CallController {
     });
   }
 
+  // ---------- Ping de cada pessoa ----------
+  async updatePings() {
+    for (const [peerId, r] of this.remotes) r.ping = await this.pm.rtt(peerId).catch(() => null);
+    this.app.renderVoiceUsers?.();
+  }
+
+  // ---------- Gravar clipe de um bloco ----------
+  startRecording(t) {
+    const { info, key } = t;
+    const tracks = [...info.stream.getVideoTracks()];
+    // junta o áudio certo: da transmissão (telas) ou a voz da pessoa (câmera)
+    if (info.isLocal) {
+      const src = [...this.media.sources.values()].find((s) => (info.kind === 'screen' ? s.screenId === info.screenId : s.kind === 'mic'));
+      if (src) tracks.push(src.outTrack);
+    } else {
+      const r = this.remotes.get(info.peerId);
+      for (const [sid, st] of r?.streams || []) {
+        const meta = r.state.streams?.[sid];
+        if (meta?.type !== 'audio') continue;
+        if (info.kind === 'screen' ? meta.screenId === info.screenId : meta.source === 'mic') tracks.push(...st.getAudioTracks());
+      }
+    }
+    const types = ['video/mp4;codecs=avc1,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'];
+    const mimeType = types.find((m) => window.MediaRecorder?.isTypeSupported(m));
+    if (!mimeType) return toast('Seu navegador não suporta gravação.', 'error');
+    const rec = new MediaRecorder(new MediaStream(tracks), { mimeType, videoBitsPerSecond: 12_000_000, audioBitsPerSecond: 256_000 });
+    const chunks = [];
+    rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+    rec.onstop = () => {
+      const blob = new Blob(chunks, { type: mimeType.split(';')[0] });
+      const a = el('a', { href: URL.createObjectURL(blob), download: `kenfeh-clip-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.${mimeType.includes('mp4') ? 'mp4' : 'webm'}` });
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+      toast(`Clipe salvo (${(blob.size / 1048576).toFixed(1)} MB) 🎬`, 'success');
+    };
+    rec.start(1000);
+    this.recorders.set(key, rec);
+    toast('⏺ Gravando… clique com o botão direito no bloco para parar.');
+    this.refreshTiles();
+  }
+
+  stopRecording(key) {
+    const rec = this.recorders.get(key);
+    if (!rec) return;
+    this.recorders.delete(key);
+    if (rec.state !== 'inactive') rec.stop();
+    this.refreshTiles();
+  }
+
+  // ---------- Soundboard ----------
+  async loadSound(item) {
+    if (this.soundCache.has(item.id)) return this.soundCache.get(item.id);
+    let buf;
+    if (item.url) {
+      const data = await (await fetch(item.url)).arrayBuffer();
+      buf = await this.media.ctx.decodeAudioData(data);
+    } else buf = await renderSound(item.id);
+    this.soundCache.set(item.id, buf);
+    return buf;
+  }
+
+  async soundboard(anchor) {
+    let mine = [];
+    try {
+      mine = (await api.get('/stickers')).stickers.filter((s) => s.kind === 'sound').map((s) => ({ id: 'u' + s.id, dbId: s.id, name: s.name || 'Som', icon: '🔉', url: s.url }));
+    } catch {}
+    const play = async (item, btn) => {
+      try {
+        btn.classList.add('playing');
+        const src = this.media.playSound(await this.loadSound(item));
+        src.onended = () => btn.classList.remove('playing');
+      } catch (err) {
+        btn.classList.remove('playing');
+        toast('Não consegui tocar esse som: ' + err.message, 'error');
+      }
+    };
+    const upload = el('input', { type: 'file', accept: 'audio/*', hidden: true });
+    upload.addEventListener('change', async () => {
+      const f = upload.files[0];
+      if (!f) return;
+      if (f.size > 2 * 1024 * 1024) return toast('Som muito grande (máx. 2 MB).', 'error');
+      try {
+        await api.upload(f, 'sound', f.name.replace(/\.[^.]+$/, '').slice(0, 30));
+        toast('Som adicionado ao seu soundboard!', 'success');
+        closeMenu();
+      } catch (err) {
+        toast(err.message, 'error');
+      }
+    });
+    const btn = (item) => {
+      const b = el('button', { class: 'sb-btn', title: item.name }, el('span', {}, item.icon), el('small', {}, item.name));
+      b.addEventListener('click', () => play(item, b));
+      if (item.dbId)
+        onContext(b, (x, y) => contextMenu(x, y, [{ label: 'Remover do soundboard', icon: 'trash', danger: true, onClick: () => api.del(`/stickers/${item.dbId}`) }]));
+      return b;
+    };
+    popover(anchor, el('div', { class: 'soundboard' },
+      el('div', { class: 'ctx-title' }, '📣 Soundboard — todo mundo na call ouve'),
+      el('div', { class: 'sb-grid' }, ...BUILTIN_SOUNDS.map(btn), ...mine.map(btn),
+        el('button', { class: 'sb-btn add', onclick: () => upload.click() }, el('span', {}, '＋'), el('small', {}, 'Enviar som'))),
+      upload,
+      el('p', { class: 'ctx-hint' }, 'O volume do soundboard fica no Mixer. Botão direito num som seu para remover.')
+    ), { className: 'sb-pop' });
+  }
+
   // ---------- Controles somem quando o mouse fica parado ----------
   setupIdle() {
     let timer;
@@ -689,8 +825,20 @@ export class CallController {
   }
 
   setupHotkeys() {
+    // push-to-talk (teclado ou botões laterais do mouse)
+    const ptt = (code, down) => {
+      const st = settings();
+      if (!this.active || !st.pttEnabled || code !== st.pttKey) return false;
+      this.media.setPtt(down);
+      return true;
+    };
+    document.addEventListener('keyup', (e) => ptt(e.code, false));
+    document.addEventListener('pointerdown', (e) => e.button > 2 && ptt(`Mouse${e.button}`, true));
+    document.addEventListener('pointerup', (e) => e.button > 2 && ptt(`Mouse${e.button}`, false));
+    window.addEventListener('blur', () => this.active && this.media?.setPtt(false));
     document.addEventListener('keydown', (e) => {
       const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName) || document.activeElement?.isContentEditable;
+      if (!typing && !e.repeat && ptt(e.code, true)) return;
       if (e.ctrlKey && e.shiftKey && e.code === 'KeyM') {
         e.preventDefault();
         this.toggleMute();
