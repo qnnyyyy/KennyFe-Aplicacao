@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#080a12" />
+  <title>Kenfeh Coop — jogar junto no mesmo PC</title>
+  <meta name="description" content="Baixe o Kenfeh Coop: seus amigos jogam no seu PC como jogadores separados, direto pelo navegador." />
+  <link rel="icon" type="image/svg+xml" href="/img/logo.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #080a12; --panel: rgba(16, 20, 36, .78); --line: rgba(255,255,255,.08); --line-2: rgba(255,255,255,.14);
+      --text: #eef1fb; --text-2: #a9b0c8; --text-3: #707893; --blue: #3d8bff; --pink: #ff4fa3; --green: #3ddc97; --yellow: #ffcc4d;
+      --grad: linear-gradient(135deg, #2f7bff 0%, #7b5cff 52%, #ff4fa3 100%);
+      --glow: 0 10px 30px -8px rgba(61,139,255,.65), 0 8px 26px -10px rgba(255,79,163,.55);
+      color-scheme: dark;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Outfit', system-ui, -apple-system, 'Segoe UI', sans-serif; line-height: 1.55; overflow-x: hidden; }
+    a { color: var(--blue); }
+    .blobs { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+    .blobs span { position: absolute; width: 55vmax; height: 55vmax; border-radius: 50%; filter: blur(100px); opacity: .2; }
+    .blobs span:nth-child(1) { background: #2f7bff; top: -25vmax; left: -15vmax; }
+    .blobs span:nth-child(2) { background: #ff4fa3; bottom: -30vmax; right: -20vmax; }
+    .wrap { max-width: 1040px; margin: 0 auto; padding: 0 20px; }
+    nav { display: flex; align-items: center; justify-content: space-between; padding: 18px 0; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 20px; color: var(--text); text-decoration: none; }
+    .brand img { width: 36px; height: 36px; border-radius: 10px; }
+    .brand span { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; padding: 12px 20px; border-radius: 14px; font: inherit; font-weight: 700; text-decoration: none; border: 0; cursor: pointer; transition: transform .15s, box-shadow .2s; }
+    .btn:active { transform: scale(.97); }
+    .btn-primary { background: var(--grad); color: #fff; box-shadow: var(--glow); }
+    .btn-ghost { background: rgba(255,255,255,.07); color: var(--text); box-shadow: inset 0 0 0 1px var(--line-2); }
+    .btn-lg { padding: 18px 30px; font-size: 18px; border-radius: 18px; }
+    header.hero { display: grid; grid-template-columns: 1.15fr .85fr; gap: 40px; align-items: center; padding: 40px 0 60px; }
+    .tag { display: inline-flex; gap: 8px; align-items: center; padding: 6px 12px; border-radius: 99px; background: rgba(61,139,255,.14); color: #9cc2ff; font-size: 13.5px; font-weight: 600; }
+    h1 { font-size: clamp(36px, 5.4vw, 58px); line-height: 1.05; margin: 16px 0; letter-spacing: -1.5px; }
+    h1 em { font-style: normal; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .lead { font-size: 18.5px; color: var(--text-2); margin: 0 0 28px; max-width: 560px; }
+    .cta { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .small { font-size: 13.5px; color: var(--text-3); }
+    .mock { position: relative; border-radius: 24px; padding: 22px; background: var(--panel); box-shadow: 0 0 0 1px var(--line-2), 0 30px 80px -30px rgba(0,0,0,.8); backdrop-filter: blur(20px); }
+    .mock-head { margin: -22px -22px 18px; padding: 18px 22px; border-radius: 24px 24px 0 0; background: var(--grad); }
+    .mock-head b { font-size: 20px; display: block; }
+    .mock-head small { opacity: .9; }
+    .mock-code { font-size: 40px; font-weight: 800; letter-spacing: 6px; margin: 4px 0 14px; }
+    .mock-row { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); font-size: 14.5px; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); flex: none; }
+    .dot.y { background: var(--yellow); }
+    .mock-row em { font-style: normal; margin-left: auto; color: var(--green); font-size: 13px; }
+    section { padding: 56px 0; }
+    h2 { font-size: clamp(28px, 3.6vw, 40px); margin: 0 0 10px; letter-spacing: -.8px; }
+    .sub { color: var(--text-2); margin: 0 0 30px; font-size: 17px; }
+    .who { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .card { padding: 24px; border-radius: 22px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); }
+    .card h3 { margin: 6px 0 8px; font-size: 21px; }
+    .card p { margin: 0; color: var(--text-2); }
+    .card .ic { font-size: 36px; }
+    .card.host { background: linear-gradient(160deg, rgba(61,139,255,.16), rgba(16,20,36,.8)); box-shadow: inset 0 0 0 1px rgba(61,139,255,.4); }
+    .card.guest { background: linear-gradient(160deg, rgba(255,79,163,.14), rgba(16,20,36,.8)); box-shadow: inset 0 0 0 1px rgba(255,79,163,.35); }
+    .pill { display: inline-block; padding: 3px 10px; border-radius: 99px; font-size: 12.5px; font-weight: 700; }
+    .pill.yes { background: rgba(61,139,255,.2); color: #9cc2ff; }
+    .pill.no { background: rgba(61,220,151,.16); color: var(--green); }
+    ol.steps { list-style: none; counter-reset: s; padding: 0; margin: 0; display: grid; gap: 14px; }
+    ol.steps li { counter-increment: s; position: relative; padding: 20px 22px 20px 78px; border-radius: 20px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); }
+    ol.steps li::before { content: counter(s); position: absolute; left: 20px; top: 18px; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 18px; background: var(--grad); box-shadow: var(--glow); }
+    ol.steps li > b { font-size: 17.5px; display: block; margin-bottom: 4px; }
+    ol.steps p { margin: 0; color: var(--text-2); }
+    ol.steps .who-tag { float: right; margin-left: 10px; }
+    kbd { display: inline-block; padding: 1px 8px; border-radius: 7px; background: rgba(255,255,255,.09); box-shadow: inset 0 -2px 0 rgba(0,0,0,.4), inset 0 0 0 1px var(--line-2); font: 600 13px 'Outfit', sans-serif; color: var(--text); }
+    .keys { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+    .key { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 14px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); color: var(--text-2); font-size: 14.5px; }
+    .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .faq details { padding: 16px 20px; border-radius: 16px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); margin-bottom: 10px; }
+    .faq summary { cursor: pointer; font-weight: 700; font-size: 16.5px; }
+    .faq p { color: var(--text-2); margin: 10px 0 0; }
+    .final { text-align: center; padding: 50px 24px; border-radius: 28px; background: radial-gradient(circle at 20% 0, rgba(47,123,255,.35), transparent 55%), radial-gradient(circle at 80% 100%, rgba(255,79,163,.3), transparent 55%), var(--panel); box-shadow: inset 0 0 0 1px var(--line-2); }
+    .final h2 { margin-bottom: 8px; }
+    .warn { padding: 14px 18px; border-radius: 16px; background: rgba(255,204,77,.08); box-shadow: inset 0 0 0 1px rgba(255,204,77,.3); color: #ffe4a3; font-size: 14.5px; margin-top: 18px; }
+    footer { padding: 40px 0 60px; color: var(--text-3); font-size: 13.5px; text-align: center; }
+    @media (max-width: 860px) {
+      header.hero, .who, .modes { grid-template-columns: 1fr; }
+      header.hero { padding-top: 20px; }
+      ol.steps li { padding-left: 70px; }
+      ol.steps .who-tag { float: none; display: inline-block; margin: 0 0 6px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="blobs" aria-hidden="true"><span></span><span></span></div>
+  <div class="wrap">
+    <nav>
+      <a class="brand" href="/"><img src="/img/logo.svg" alt="" /><b>Ken<span>feh</span></b></a>
+      <a class="btn btn-ghost" href="/">Abrir o Kenfeh</a>
+    </nav>
+
+    <header class="hero">
+      <div>
+        <span class="tag">🕹️ Modo Jogo Coop</span>
+        <h1>Joguem <em>juntos</em> no mesmo PC — cada um de casa.</h1>
+        <p class="lead">Você transmite o jogo na call e seus amigos jogam com você como <b>jogadores separados</b> (Jogador 2, 3 e 4), igual a um coop local no sofá. Eles não instalam nada.</p>
+        <div class="cta">
+          <a class="btn btn-primary btn-lg" href="/download/KenfehCoop.exe" download>⬇️ Baixar Kenfeh Coop</a>
+          <a class="btn btn-ghost" href="#passo-a-passo">Ver o passo a passo</a>
+        </div>
+        <p class="small" style="margin-top:14px">Windows 10 ou 11 • um arquivo só (~6 MB) • só quem transmite o jogo precisa baixar</p>
+      </div>
+      <div class="mock" aria-hidden="true">
+        <div class="mock-head"><b>Kenfeh Coop</b><small>Seus amigos jogam no seu PC como jogadores separados</small></div>
+        <small style="color:var(--text-3);font-weight:700;letter-spacing:.5px">CÓDIGO DE PAREAMENTO</small>
+        <div class="mock-code">482 913</div>
+        <div class="mock-row"><span class="dot"></span>Site conectado (kenfeh.shop)</div>
+        <div class="mock-row"><span class="dot"></span>Controles virtuais prontos</div>
+        <div class="mock-row"><span class="dot y"></span>Jogador 1 — você</div>
+        <div class="mock-row"><span class="dot"></span>Jogador 2 — Fe <em>● jogando</em></div>
+        <div class="mock-row"><span class="dot"></span>Jogador 3 — Léo <em>● jogando</em></div>
+      </div>
+    </header>
+
+    <section>
+      <h2>Quem precisa baixar?</h2>
+      <p class="sub">Só uma pessoa: quem está rodando o jogo no PC.</p>
+      <div class="who">
+        <div class="card host">
+          <div class="ic">🖥️</div>
+          <span class="pill yes">BAIXA O APP</span>
+          <h3>Quem transmite (o "host")</h3>
+          <p>É quem tem o jogo aberto no PC e compartilha a tela na call. Baixa o <b>Kenfeh Coop</b> uma vez, abre e pronto. Continua jogando normalmente com o próprio teclado, mouse ou controle — é o <b>Jogador 1</b>.</p>
+        </div>
+        <div class="card guest">
+          <div class="ic">🎮</div>
+          <span class="pill no">NÃO BAIXA NADA</span>
+          <h3>Os amigos (convidados)</h3>
+          <p>Entram na call pelo navegador e clicam em <b>"Pedir para jogar"</b> na tela do jogo. Jogam com controle (é só conectar) ou com teclado e mouse. Cada um vira o <b>Jogador 2, 3 ou 4</b>.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="passo-a-passo">
+      <h2>Passo a passo</h2>
+      <p class="sub">Leva uns 2 minutos na primeira vez. Depois, é só abrir o app.</p>
+      <ol class="steps">
+        <li><span class="pill yes who-tag">HOST</span><b>Baixe e abra o Kenfeh Coop</b>
+          <p>Clique em <a href="/download/KenfehCoop.exe" download>Baixar Kenfeh Coop</a> e abra o <kbd>KenfehCoop.exe</kbd>. Se o Windows mostrar <i>"O Windows protegeu o computador"</i>, clique em <b>Mais informações → Executar assim mesmo</b> (o app é nosso e não tem assinatura paga da Microsoft).</p></li>
+        <li><span class="pill yes who-tag">HOST • SÓ NA 1ª VEZ</span><b>Ative os controles virtuais</b>
+          <p>O app pergunta <i>"Ativar agora?"</i> → clique em <b>Sim</b> e confirme o aviso de administrador do Windows. O componente já vem dentro do app — nada para baixar. Depois disso, aparece <b>"Controles virtuais prontos"</b>.</p></li>
+        <li><span class="pill yes who-tag">HOST</span><b>Entre na call e compartilhe a tela do jogo</b>
+          <p>No Kenfeh, entre na call do grupo (ou ligue para um amigo) e clique em <b>Compartilhar tela</b> → escolha a janela ou o monitor do jogo.</p></li>
+        <li><span class="pill yes who-tag">HOST</span><b>Ligue o Modo Coop e digite o código</b>
+          <p>Clique no botão <kbd>🕹️</kbd> da barra da call, digite o <b>código de 6 números</b> que aparece no app e clique em <b>Conectar</b>. Se o navegador perguntar sobre "dispositivos na rede local", permita — é o site falando com o app no seu próprio PC. Escolha a tela do jogo e clique em <b>Ligar Modo Coop</b>.</p></li>
+        <li><span class="pill no who-tag">AMIGO</span><b>Peça para jogar</b>
+          <p>Na tela do jogo (com a etiqueta <b>COOP</b>) aparece o botão <b>"🎮 Pedir para jogar"</b>. O host recebe o pedido e clica em <b>Aceitar</b>.</p></li>
+        <li><span class="pill no who-tag">AMIGO</span><b>Clique no vídeo e jogue</b>
+          <p>Com controle: é só usar. Com teclado e mouse: clique no vídeo para capturar. <kbd>Esc</kbd> solta o mouse e <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Q</kbd> para de jogar. No jogo, configure o "Jogador 2" para usar controle, como faria num coop local.</p></li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>Sem controle? Teclado e mouse viram controle</h2>
+      <p class="sub">O amigo que só tem teclado e mouse aparece para o jogo como um controle de Xbox:</p>
+      <div class="keys">
+        <div class="key"><kbd>W A S D</kbd> analógico esquerdo</div>
+        <div class="key"><kbd>Mouse</kbd> analógico direito (câmera)</div>
+        <div class="key"><kbd>Espaço</kbd> botão A</div>
+        <div class="key"><kbd>F</kbd> / <kbd>Shift</kbd> botão B</div>
+        <div class="key"><kbd>E</kbd> botão X</div>
+        <div class="key"><kbd>R</kbd> botão Y</div>
+        <div class="key"><kbd>Q</kbd> / <kbd>G</kbd> LB / RB</div>
+        <div class="key"><kbd>Clique dir.</kbd> / <kbd>Z</kbd> gatilho LT</div>
+        <div class="key"><kbd>Clique esq.</kbd> / <kbd>C</kbd> gatilho RT</div>
+        <div class="key"><kbd>Setas</kbd> direcional</div>
+        <div class="key"><kbd>Enter</kbd> Start • <kbd>Tab</kbd> Select</div>
+        <div class="key"><kbd>Ctrl</kbd> / <kbd>V</kbd> L3 / R3</div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Dois jeitos de jogar</h2>
+      <p class="sub">O host escolhe na hora de ligar o Modo Coop.</p>
+      <div class="modes">
+        <div class="card"><div class="ic">🎮</div><h3>Jogador separado <span class="pill yes">recomendado</span></h3>
+          <p>Cada amigo ganha um controle virtual próprio (até 3 amigos + você). O jogo enxerga pessoas diferentes. Perfeito para <b>It Takes Two, Cuphead, Overcooked, Moving Out, Castle Crashers, emuladores</b> e qualquer jogo com coop local.</p></div>
+        <div class="card"><div class="ic">⌨️</div><h3>Dividir meu teclado e mouse</h3>
+          <p>O teclado e o mouse do amigo apertam no seu, junto com você. Bom para jogos de <b>teclado dividido</b> (P1 no WASD, P2 nas setas), jogos de turno, menus e estratégia.</p></div>
+      </div>
+    </section>
+
+    <section class="faq">
+      <h2>Dúvidas</h2>
+      <details><summary>Por que não aparecem "dois teclados" para o jogo?</summary>
+        <p>O Windows junta todos os teclados e mouses numa entrada só — mesmo com dois teclados plugados de verdade, quase nenhum jogo separa em dois jogadores. Controles, sim: cada um é reconhecido como uma pessoa diferente. Por isso cada amigo vira um controle (é o mesmo jeito que o Steam Remote Play e o Parsec fazem).</p></details>
+      <details><summary>É seguro? Alguém pode mexer no meu PC sem eu deixar?</summary>
+        <p>Não. O app só aceita conexões do próprio PC, vindas do site do Kenfeh, e só depois de você digitar o código. Ninguém joga sem você aceitar o pedido, a tecla Windows é sempre bloqueada e você corta tudo na hora com <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd> no site ou no botão <b>Parar tudo</b> do app. Fechou o app, acabou.</p></details>
+      <details><summary>O que é instalado no meu PC?</summary>
+        <p>Só o componente de controle virtual (ViGEmBus, de código aberto e assinado), que já vem dentro do app e é instalado uma única vez com a sua permissão. O Kenfeh Coop em si não instala nada: é um arquivo que você abre quando quiser jogar.</p></details>
+      <details><summary>Funciona em qualquer jogo?</summary>
+        <p>Funciona em jogos que aceitam mais de um controle (coop local). Jogos com anti-cheat — Valorant, CS2, Fortnite, etc. — podem bloquear ou punir controle simulado, então não use neles. Se o jogo roda como Administrador, abra o Kenfeh Coop como Administrador também (botão direito → Executar como administrador).</p></details>
+      <details><summary>Tem atraso?</summary>
+        <p>O comando do amigo vai direto para o seu PC (conexão ponto a ponto), então o atraso é praticamente o da própria transmissão da tela — normalmente entre 50 e 150 ms.</p></details>
+      <details><summary>O amigo pode usar celular?</summary>
+        <p>Pode assistir e conversar, mas para jogar é melhor um computador com controle ou teclado e mouse.</p></details>
+    </section>
+
+    <section>
+      <div class="final">
+        <h2>Bora jogar junto? 🎮</h2>
+        <p class="sub" style="margin-bottom:24px">Baixe uma vez, chame a galera e joguem como se estivessem no mesmo sofá.</p>
+        <a class="btn btn-primary btn-lg" href="/download/KenfehCoop.exe" download>⬇️ Baixar Kenfeh Coop para Windows</a>
+        <div class="warn">⚠️ Aviso do Windows "O Windows protegeu o computador"? Clique em <b>Mais informações → Executar assim mesmo</b>. Ele aparece porque o app é novo e não tem certificado pago — não é vírus.</div>
+      </div>
+    </section>
+
+    <footer>Kenfeh • Modo Jogo Coop</footer>
+  </div>
+</body>
+</html>

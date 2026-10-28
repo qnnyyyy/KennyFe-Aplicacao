@@ -101,6 +101,11 @@ async function main() {
     res.type('html').send(html);
   };
   app.get(['/', '/index.html'], sendIndex);
+  // página pública de download do Kenfeh Coop
+  app.get(['/coop', '/coop/'], (_req, res) => {
+    res.setHeader('Cache-Control', 'no-cache');
+    res.sendFile(path.join(PUBLIC_DIR, 'coop.html'));
+  });
   app.use(express.static(PUBLIC_DIR, { index: false, maxAge: 0 }));
   app.get('*', sendIndex);
 

@@ -536,6 +536,7 @@ export class CoopController {
             !agentOn
               ? el('div', { class: 'inline-form' },
                   el('a', { class: 'btn btn-ghost btn-sm', href: '/download/KenfehCoop.exe', download: 'KenfehCoop.exe' }, icon('download', 14), 'Baixar Kenfeh Coop (Windows)'),
+                  el('a', { class: 'btn btn-ghost btn-sm', href: '/coop', target: '_blank', rel: 'noopener' }, 'Como funciona?'),
                   code,
                   el('button', { class: 'btn btn-primary btn-sm', onclick: () => this.connectAgent(code.value.trim()) }, 'Conectar'))
               : null,
