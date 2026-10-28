@@ -95,6 +95,19 @@ addUserCol('activity', 'TEXT'); // JSON { name, since, source }
 addUserCol('tetris_xp', 'INTEGER NOT NULL DEFAULT 0');
 addUserCol('tetris_skin', "TEXT NOT NULL DEFAULT 'classic'");
 
+// Amizades (user_id pediu para friend_id) e conversas diretas (grupos is_dm)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS friendships (
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    friend_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    status     TEXT NOT NULL DEFAULT 'pending', -- pending | accepted
+    created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+    PRIMARY KEY (user_id, friend_id)
+  );
+`);
+const groupCols = db.prepare('PRAGMA table_info(groups)').all().map((c) => c.name);
+if (!groupCols.includes('is_dm')) db.exec('ALTER TABLE groups ADD COLUMN is_dm INTEGER NOT NULL DEFAULT 0');
+
 // Limpa sessões expiradas a cada inicialização
 db.prepare('DELETE FROM sessions WHERE expires_at < unixepoch()').run();
 

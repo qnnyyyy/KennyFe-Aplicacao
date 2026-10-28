@@ -13,6 +13,23 @@ const { createHub } = require('./hub');
 const { attachGames } = require('./games');
 
 const PORT = Number(process.env.PORT) || 3000;
+const PUBLIC_DIR = path.join(__dirname, '..', 'public');
+
+// "versão" do site = hash de todos os arquivos públicos (muda a cada atualização)
+function buildHash() {
+  const h = require('node:crypto').createHash('sha1');
+  const walk = (dir) => {
+    for (const f of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      const p = path.join(dir, f.name);
+      if (f.isDirectory()) walk(p);
+      else h.update(f.name).update(fs.readFileSync(p));
+    }
+  };
+  walk(PUBLIC_DIR);
+  h.update(fs.readFileSync(path.join(__dirname, 'tetris-skins.js')));
+  return h.digest('hex').slice(0, 10);
+}
+const BUILD = buildHash();
 const USE_HTTPS = process.argv.includes('--https') || process.env.HTTPS === '1';
 
 async function loadCertificate() {
@@ -74,10 +91,29 @@ async function main() {
     res.setHeader('Content-Disposition', 'attachment; filename="Kenfeh-Coop.bat"');
     res.type('application/octet-stream').send(bat);
   });
-  app.get('/js/tetris-skins.js', (_req, res) => res.type('application/javascript').send(`export const TETRIS_SKINS = ${JSON.stringify(require('./tetris-skins').TETRIS_SKINS)};`));
+  const skinsJs = (_req, res) => res.type('application/javascript').send(`export const TETRIS_SKINS = ${JSON.stringify(require('./tetris-skins').TETRIS_SKINS)};`);
+  app.get('/js/tetris-skins.js', skinsJs);
   app.get('/vendor/gifenc.js', (_req, res) => res.sendFile(require.resolve('gifenc/dist/gifenc.esm.js')));
-  app.use(express.static(path.join(__dirname, '..', 'public'), { extensions: ['html'] }));
-  app.get('*', (_req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'index.html')));
+  // Arquivos do site versionados: a cada atualização o endereço muda (/v/<hash>/...),
+  // então nem o navegador nem a Cloudflare conseguem servir JavaScript velho.
+  const versioned = express.Router();
+  versioned.get('/js/tetris-skins.js', (req, res) => {
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    skinsJs(req, res);
+  });
+  versioned.use(express.static(PUBLIC_DIR, { maxAge: '365d', immutable: true, index: false }));
+  app.use('/v/:build', versioned);
+  const html = fs
+    .readFileSync(path.join(PUBLIC_DIR, 'index.html'), 'utf8')
+    .replace('href="/css/app.css"', `href="/v/${BUILD}/css/app.css"`)
+    .replace('src="/js/main.js"', `src="/v/${BUILD}/js/main.js"`);
+  const sendIndex = (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.type('html').send(html);
+  };
+  app.get(['/', '/index.html'], sendIndex);
+  app.use(express.static(PUBLIC_DIR, { index: false, maxAge: 0 }));
+  app.get('*', sendIndex);
 
   server.listen(PORT, '0.0.0.0', () => {
     const proto = USE_HTTPS ? 'https' : 'http';

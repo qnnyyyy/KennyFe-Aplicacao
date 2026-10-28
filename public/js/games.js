@@ -4,7 +4,7 @@ import { FREE_GAMES } from './gamesdata.js';
 import { TetrisGame } from './tetris.js';
 
 const BUILTIN = [
-  { type: 'tetris', icon: '🧱', name: 'Tetris Royale', desc: 'Estilo TETR.IO: mande lixo, sobreviva, seja o último. Libera estilos de torre!', players: '1–16' },
+  { type: 'tetris', icon: '🧱', name: 'Tetris Royale', desc: 'Parecido com Tetris: mande lixo, sobreviva, seja o último. Libera estilos de torre!', players: '1–16' },
   { type: 'draw', icon: '🎨', name: 'Desenha & Adivinha', desc: 'Um desenha, a galera adivinha. Estilo Gartic.', players: '2–12' },
   { type: 'reaction', icon: '⚡', name: 'Reflexo', desc: 'Ficou verde? Clica! Quem é o mais rápido?', players: '1–16' },
   { type: 'connect4', icon: '🔴', name: 'Lig 4', desc: 'Alinhe 4 peças antes do outro.', players: '2' },

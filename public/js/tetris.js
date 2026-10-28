@@ -1,4 +1,4 @@
-// Tetris Royale (estilo TETR.IO): SRS + wall kicks, saco de 7, hold, fila, fantasma,
+// Tetris Royale (estilo Tetris): SRS + wall kicks, saco de 7, hold, fila, fantasma,
 // T-spin, combos, back-to-back, perfect clear e lixo mandado para os outros.
 // Cada jogador simula o próprio tabuleiro (sem lag); o servidor só arbitra a sala.
 import { el, toast, store, save } from './ui.js';

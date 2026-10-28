@@ -46,6 +46,9 @@ function createHub(io) {
       for (const id of ids) for (const s of online.get(id) || []) s.emit('user:update', { user: u });
     },
     online,
+    friendsChanged(userIds, event) {
+      for (const id of userIds) for (const s of online.get(id) || []) s.emit('friends:update', event);
+    },
     leaveGroupRoom(userId, groupId) {
       for (const s of online.get(userId) || []) {
         s.leave(`group:${groupId}`);

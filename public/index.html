@@ -54,7 +54,7 @@
   <!-- ===== Aplicativo ===== -->
   <section id="app" class="app hidden">
     <aside class="rail">
-      <img class="rail-brand" src="/img/logo.svg" alt="Kenfeh" title="Kenfeh" />
+      <button class="rail-home" id="btn-home" title="Início — amigos e conversas"><img class="rail-brand" src="/img/logo.svg" alt="Kenfeh" /><span class="rail-badge hidden" id="home-badge"></span></button>
       <div class="rail-sep"></div>
       <nav id="group-rail" class="rail-groups"></nav>
       <button class="rail-btn rail-add" id="btn-new-group" title="Criar ou entrar em um grupo">+</button>
@@ -65,7 +65,8 @@
         <div class="sidebar-title" id="sidebar-title">Bem-vindo(a)</div>
         <button class="icon-btn" id="btn-group-menu" title="Opções do grupo"></button>
       </header>
-      <div class="sidebar-body">
+      <div class="sidebar-body home-side hidden" id="home-side"></div>
+      <div class="sidebar-body group-side" id="group-side">
         <div class="channel" id="channel-chat"><span class="ch-ic">#</span> conversa</div>
         <div class="channel voice" id="channel-voice"><span class="ch-ic" data-icon="volume"></span> call <span class="call-count" id="call-count"></span></div>
         <div class="voice-users" id="voice-users"></div>
@@ -87,18 +88,8 @@
     </aside>
 
     <main class="main" id="main">
-      <!-- Tela inicial sem grupo -->
-      <div class="welcome" id="welcome">
-        <div class="welcome-inner">
-          <img class="welcome-logo" src="/img/logo.svg" alt="" />
-          <h2>Oi, <span id="welcome-name"></span>!</h2>
-          <p>Crie um grupo e chame a galera com o código de convite. Call, tela, chat e figurinhas no mesmo lugar.</p>
-          <div class="welcome-actions">
-            <button class="btn btn-primary btn-lg" id="welcome-create">Criar grupo</button>
-            <button class="btn btn-ghost btn-lg" id="welcome-join">Entrar com convite</button>
-          </div>
-        </div>
-      </div>
+      <!-- Início (amigos, conversas, atividade) -->
+      <div class="home" id="home"></div>
 
       <!-- Área do grupo: call (palco) + chat -->
       <div class="room hidden" id="room">

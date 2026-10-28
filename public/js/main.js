@@ -8,6 +8,7 @@ import { emojiPicker } from './emoji.js';
 import { popover, closeMenu } from './ui.js';
 import { openProfile, activityLine } from './profile.js';
 import { GamesHub } from './games.js';
+import { Home } from './home.js';
 
 const GROUP_ICONS = ['🎮', '🍿', '🎬', '🎧', '🔥', '⚡', '🌙', '👾', '🏆', '🐱', '✨', '🍕'];
 
@@ -15,7 +16,7 @@ const app = {
   me: null,
   socket: null,
   groups: new Map(),
-  currentGroupId: store('current-group', null),
+  currentGroupId: null, // null = Início
   online: new Set(),
   calls: new Map(), // groupId -> participants
   lastRead: store('last-read', {}),
@@ -34,6 +35,12 @@ const app = {
   },
   group(id) {
     return this.groups.get(id);
+  },
+  // nome para mostrar: em conversa direta é o nome da outra pessoa
+  groupTitle(g) {
+    if (!g) return '';
+    if (g.isDm) return (g.members.find((m) => m.id !== this.me.id) || g.members[0])?.displayName || 'Conversa';
+    return `${g.icon} ${g.name}`;
   },
 };
 
@@ -91,12 +98,12 @@ function start(user) {
   app.me = user;
   $('#auth').classList.add('hidden');
   $('#app').classList.remove('hidden');
-  $('#welcome-name').textContent = user.displayName;
 
   const socket = (app.socket = io({ transports: ['websocket', 'polling'] }));
   app.chat = new Chat(app);
   app.call = new CallController(app);
   app.games = new GamesHub(app);
+  app.renderAll = () => renderAll();
 
   socket.on('connect_error', (err) => {
     if (err.message === 'unauthorized') location.reload();
@@ -105,7 +112,7 @@ function start(user) {
     app.groups = new Map(groups.map((g) => [g.id, g]));
     const me = groups.flatMap((g) => g.members).find((m) => m.id === app.me.id);
     if (me) Object.assign(app.me, me);
-    if (!app.groups.has(app.currentGroupId)) app.currentGroupId = groups[0]?.id ?? null;
+    if (app.currentGroupId && !app.groups.has(app.currentGroupId)) app.currentGroupId = null;
     renderAll();
     if (app.currentGroupId && app.chat.groupId !== app.currentGroupId) selectGroup(app.currentGroupId);
     if (app.call.active) app.call.refreshTiles();
@@ -116,6 +123,8 @@ function start(user) {
       if (i >= 0) g.members[i] = { ...g.members[i], ...user };
     }
     if (user.id === app.me.id) Object.assign(app.me, user);
+    app.home?.onUserUpdate(user);
+    renderHome();
     renderMembers();
     renderVoiceUsers();
     renderMeBar();
@@ -124,9 +133,11 @@ function start(user) {
   socket.on('presence', ({ online }) => {
     app.online = new Set(online);
     renderMembers();
+    renderHome();
   });
   socket.on('calls:update', ({ groupId, participants }) => {
     app.calls.set(groupId, participants);
+    renderHome();
     renderRail();
     renderVoiceUsers();
     renderRoomHeader();
@@ -135,11 +146,13 @@ function start(user) {
     if (app.call.active && app.call.groupId === groupId) return;
     const g = app.group(groupId);
     sfx('ring');
-    toast(el('div', { class: 'ring-toast' }, el('span', {}, `📞 ${app.userName(userId)} começou uma call em ${g?.name || 'um grupo'}`), el('button', { class: 'btn btn-primary btn-sm', onclick: () => { selectGroup(groupId); app.call.join(groupId); } }, 'Entrar')), 'info', 10000);
+    const text = g?.isDm ? `📞 ${app.userName(userId)} está te ligando!` : `📞 ${app.userName(userId)} começou uma call em ${g?.name || 'um grupo'}`;
+    toast(el('div', { class: 'ring-toast' }, el('span', {}, text), el('button', { class: 'btn btn-primary btn-sm', onclick: () => { selectGroup(groupId); app.call.join(groupId); } }, g?.isDm ? 'Atender' : 'Entrar')), 'info', 15000);
     app.notify({ groupId, author: app.user(userId), type: 'text', content: '📞 começou uma call — vem!' });
   });
 
   setupStatic();
+  app.home = new Home(app, { selectGroup, newGroupDialog });
   renderAll();
   if ('Notification' in window && Notification.permission === 'default') {
     document.addEventListener('click', () => Notification.requestPermission().catch(() => {}), { once: true });
@@ -181,7 +194,7 @@ app.notify = (m) => {
   const g = app.group(m.groupId);
   const body = m.type === 'text' ? m.content : { sticker: '🌟 figurinha', gif: '🎞️ GIF', image: '🖼️ imagem', video: '🎥 vídeo', audio: '🎵 áudio', file: '📎 arquivo' }[m.type];
   try {
-    const n = new Notification(`${m.author?.displayName || ''} • ${g?.name || 'Kenfeh'}`, { body, icon: m.author?.avatarUrl || undefined, tag: 'kf-' + m.groupId });
+    const n = new Notification(g?.isDm ? `${m.author?.displayName || ''} (mensagem direta)` : `${m.author?.displayName || ''} • ${g?.name || 'Kenfeh'}`, { body, icon: m.author?.avatarUrl || undefined, tag: 'kf-' + m.groupId });
     n.onclick = () => { window.focus(); selectGroup(m.groupId); n.close(); };
   } catch {}
 };
@@ -199,6 +212,7 @@ function selectGroup(id) {
   app.currentGroupId = id;
   save('current-group', id);
   $('#app').classList.remove('nav-open');
+  if (!id) app.chat.groupId = null;
   renderAll();
   if (id) app.chat.open(id);
   app.games?.onGroupChanged();
@@ -208,6 +222,7 @@ function selectGroup(id) {
 // RENDER
 // =====================================================================
 function renderAll() {
+  renderHome();
   renderRail();
   renderSidebar();
   renderMembers();
@@ -217,10 +232,21 @@ function renderAll() {
   renderRoomLayout();
 }
 
+function renderHome() {
+  if (!app.home) return;
+  app.home.renderSide();
+  if (!app.currentGroupId) app.home.render();
+}
+
 function renderRail() {
+  const homeMode = !app.group(app.currentGroupId) || app.group(app.currentGroupId).isDm;
+  $('#btn-home').classList.toggle('active', homeMode);
+  const badge = app.home?.badgeCount() || 0;
+  $('#home-badge').classList.toggle('hidden', !badge);
+  $('#home-badge').textContent = badge > 9 ? '9+' : badge;
   const rail = $('#group-rail');
   rail.replaceChildren(
-    ...[...app.groups.values()].map((g) => {
+    ...[...app.groups.values()].filter((g) => !g.isDm).map((g) => {
       const unread = (g.lastMessageId || 0) > (app.lastRead[g.id] || 0) && g.id !== app.currentGroupId;
       const inCall = (app.calls.get(g.id) || []).length > 0;
       const b = el('button', { class: `rail-btn ${g.id === app.currentGroupId ? 'active' : ''} ${unread ? 'unread' : ''}`, title: g.name, onclick: () => selectGroup(g.id) },
@@ -235,9 +261,11 @@ function renderRail() {
 
 function renderSidebar() {
   const g = app.group(app.currentGroupId);
-  $('#sidebar-title').textContent = g ? `${g.icon} ${g.name}` : 'Kenfeh';
-  $('#btn-group-menu').classList.toggle('hidden', !g);
-  $('.sidebar-body').classList.toggle('hidden', !g);
+  const homeMode = !g || g.isDm;
+  $('#sidebar-title').textContent = homeMode ? 'Início' : app.groupTitle(g);
+  $('#btn-group-menu').classList.toggle('hidden', homeMode);
+  $('#home-side').classList.toggle('hidden', !homeMode);
+  $('#group-side').classList.toggle('hidden', homeMode);
 }
 
 function renderMembers() {
@@ -303,7 +331,7 @@ function renderVoiceUsers() {
   $('#voice-panel').classList.toggle('hidden', !inCall);
   if (inCall) {
     const cg = app.group(app.call.groupId);
-    $('#vp-group').textContent = cg ? `${cg.icon} ${cg.name}` : '';
+    $('#vp-group').textContent = app.groupTitle(cg);
   }
   $('#channel-voice').classList.toggle('active', inCall && app.call.groupId === app.currentGroupId);
 }
@@ -327,8 +355,8 @@ function renderMeBar() {
 function renderRoomHeader() {
   const g = app.group(app.currentGroupId);
   if (!g) return;
-  $('#chat-icon').textContent = g.icon;
-  $('#chat-name').textContent = g.name;
+  $('#chat-icon').textContent = g.isDm ? '@' : g.icon;
+  $('#chat-name').textContent = g.isDm ? app.groupTitle(g) : g.name;
   const btn = $('#btn-join-call');
   const here = app.call.active && app.call.groupId === g.id;
   const count = (app.calls.get(g.id) || []).length;
@@ -339,7 +367,7 @@ function renderRoomHeader() {
 
 function renderRoomLayout() {
   const g = app.group(app.currentGroupId);
-  $('#welcome').classList.toggle('hidden', Boolean(g));
+  $('#home').classList.toggle('hidden', Boolean(g));
   $('#room').classList.toggle('hidden', !g);
   const showStage = app.call.active && app.call.groupId === app.currentGroupId;
   $('#stage-wrap').classList.toggle('hidden', !showStage);
@@ -445,8 +473,7 @@ function newGroupDialog(startTab = 'create') {
 
 function setupStatic() {
   $('#btn-new-group').onclick = () => newGroupDialog('create');
-  $('#welcome-create').onclick = () => newGroupDialog('create');
-  $('#welcome-join').onclick = () => newGroupDialog('join');
+  $('#btn-home').onclick = () => selectGroup(null);
   setIcon($('#btn-group-menu'), 'chevron-down', 18);
   $('#btn-group-menu').onclick = (e) => {
     const g = app.group(app.currentGroupId);

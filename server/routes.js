@@ -110,6 +110,7 @@ function groupPayload(g) {
     icon: g.icon,
     ownerId: g.owner_id,
     inviteCode: g.invite_code,
+    isDm: Boolean(g.is_dm),
     members: groupMembers(g.id),
     lastMessageId: last ? last.id : 0,
   };
@@ -265,6 +266,74 @@ function buildRouter(io, hub) {
     res.json({ ok: true });
   });
 
+  // ---------- Amigos ----------
+  const friendRow = (a, b) => db.prepare('SELECT * FROM friendships WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)').get(a, b, b, a);
+
+  r.get('/friends', (req, res) => {
+    const me = req.user.id;
+    const rows = db.prepare('SELECT * FROM friendships WHERE user_id = ? OR friend_id = ?').all(me, me);
+    const friends = rows.map((f) => {
+      const otherId = f.user_id === me ? f.friend_id : f.user_id;
+      const status = f.status === 'accepted' ? 'accepted' : f.user_id === me ? 'outgoing' : 'incoming';
+      return { user: auth.publicUser(db.prepare('SELECT * FROM users WHERE id = ?').get(otherId)), status, since: f.created_at };
+    }).filter((f) => f.user);
+    res.json({ friends });
+  });
+
+  r.post('/friends', (req, res) => {
+    const username = String(req.body.username || '').trim().replace(/^@/, '').toLowerCase();
+    const other = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+    if (!other) return res.status(404).json({ error: 'Não achei ninguém com esse usuário. Confira o @ (sem espaços).' });
+    if (other.id === req.user.id) return res.status(400).json({ error: 'Esse é você 😄' });
+    const f = friendRow(req.user.id, other.id);
+    if (f?.status === 'accepted') return res.status(409).json({ error: 'Vocês já são amigos!' });
+    if (f && f.user_id === req.user.id) return res.status(409).json({ error: 'Pedido já enviado — esperando a pessoa aceitar.' });
+    if (f) {
+      // a outra pessoa já tinha pedido: aceita direto
+      db.prepare("UPDATE friendships SET status = 'accepted' WHERE user_id = ? AND friend_id = ?").run(other.id, req.user.id);
+      hub.friendsChanged([req.user.id, other.id], { type: 'accepted', by: req.user.id });
+      return res.json({ ok: true, accepted: true });
+    }
+    db.prepare('INSERT INTO friendships (user_id, friend_id) VALUES (?, ?)').run(req.user.id, other.id);
+    hub.friendsChanged([req.user.id, other.id], { type: 'request', by: req.user.id });
+    res.json({ ok: true });
+  });
+
+  r.post('/friends/:id/accept', (req, res) => {
+    const id = Number(req.params.id);
+    const info = db.prepare("UPDATE friendships SET status = 'accepted' WHERE user_id = ? AND friend_id = ? AND status = 'pending'").run(id, req.user.id);
+    if (!info.changes) return res.status(404).json({ error: 'Pedido não encontrado.' });
+    hub.friendsChanged([req.user.id, id], { type: 'accepted', by: req.user.id });
+    res.json({ ok: true });
+  });
+
+  r.delete('/friends/:id', (req, res) => {
+    const id = Number(req.params.id);
+    db.prepare('DELETE FROM friendships WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)').run(req.user.id, id, id, req.user.id);
+    hub.friendsChanged([req.user.id, id], { type: 'removed', by: req.user.id });
+    res.json({ ok: true });
+  });
+
+  // Conversa direta (DM): reaproveita se já existir
+  r.post('/dm/:userId', (req, res) => {
+    const other = db.prepare('SELECT * FROM users WHERE id = ?').get(Number(req.params.userId));
+    if (!other || other.id === req.user.id) return res.status(404).json({ error: 'Usuário não encontrado.' });
+    const shareGroup = db.prepare('SELECT 1 FROM group_members a JOIN group_members b ON a.group_id = b.group_id WHERE a.user_id = ? AND b.user_id = ?').get(req.user.id, other.id);
+    if (friendRow(req.user.id, other.id)?.status !== 'accepted' && !shareGroup) return res.status(403).json({ error: 'Adicione como amigo primeiro.' });
+    let g = db.prepare(
+      `SELECT g.* FROM groups g WHERE g.is_dm = 1
+         AND EXISTS (SELECT 1 FROM group_members WHERE group_id = g.id AND user_id = ?)
+         AND EXISTS (SELECT 1 FROM group_members WHERE group_id = g.id AND user_id = ?)`
+    ).get(req.user.id, other.id);
+    if (!g) {
+      const info = db.prepare("INSERT INTO groups (name, icon, owner_id, invite_code, is_dm) VALUES ('', '💬', ?, ?, 1)").run(req.user.id, inviteCode());
+      db.prepare('INSERT INTO group_members (group_id, user_id) VALUES (?, ?), (?, ?)').run(info.lastInsertRowid, req.user.id, info.lastInsertRowid, other.id);
+      g = db.prepare('SELECT * FROM groups WHERE id = ?').get(info.lastInsertRowid);
+    }
+    notifyGroup(g.id);
+    res.json({ group: groupPayload(g) });
+  });
+
   // ---------- Grupos ----------
   r.get('/groups', (req, res) => {
     const groups = db
@@ -286,7 +355,7 @@ function buildRouter(io, hub) {
   r.post('/groups/join', (req, res) => {
     const code = String(req.body.code || '').trim().toUpperCase();
     const g = db.prepare('SELECT * FROM groups WHERE invite_code = ?').get(code);
-    if (!g) return res.status(404).json({ error: 'Convite inválido.' });
+    if (!g || g.is_dm) return res.status(404).json({ error: 'Convite inválido.' });
     if (!isMember(g.id, req.user.id)) {
       db.prepare('INSERT INTO group_members (group_id, user_id) VALUES (?, ?)').run(g.id, req.user.id);
       hub.broadcastMessage(createMessage({ groupId: g.id, userId: req.user.id, type: 'system', content: 'entrou no grupo 🎉' }));

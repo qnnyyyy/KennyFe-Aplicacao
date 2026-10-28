@@ -62,7 +62,7 @@ Outras variáveis: `PORT` (padrão 3000), `DATA_DIR` (onde ficam banco e uploads
 
 ### Jogos
 - Aba **🎮 Jogos** ao lado do chat, com minijogos multiplayer que rodam no próprio site: **Desenha & Adivinha** (estilo Gartic), **Reflexo**, **Lig 4** e **Jogo da velha**. O grupo inteiro recebe o convite e dá pra jogar durante a call.
-- **🧱 Tetris Royale** (estilo TETR.IO), de 1v1 até 16 pessoas:
+- **🧱 Tetris Royale** (parecido com Tetris), de 1v1 até 16 pessoas:
   - **Jogo:** rotação SRS com wall kicks, hold, 5 próximas peças, peça fantasma, hard drop, T-spins, combos, back-to-back e perfect clear mandando **lixo** para os outros.
   - **Tela:** mostra quantos tabuleiros couberem, e quem é eliminado sai da tela.
   - **Progresso:** **15 estilos de torre** liberados por XP (linhas limpas + colocação).
@@ -100,6 +100,9 @@ Quem transmite liga o Modo Coop numa tela compartilhada. O amigo clica em **"�
 - **Estúdio ✨:**
   - *Figurinha:* foto da webcam, imagem do PC, textos com fontes de meme, emojis, pincel/borracha, moldura (círculo, arredondado, coração) e contorno branco estilo WhatsApp.
   - *GIF:* grave a webcam (com contagem 3-2-1), um pedaço da tela, recorte um trecho de vídeo do PC ou junte várias fotos. Corte início/fim, velocidade, bumerangue/reverso, filtros e legenda em cima/embaixo.
+
+### Início (amigos e conversas diretas)
+- Ao entrar no site você cai no **Início**, como no Discord: lista de amigos (online / todos / pendentes), **adicionar amigo pelo @**, conversas diretas (DM) com chat e call, quem está **jogando agora** e as **calls rolando** com botão de entrar.
 
 ### Contas e grupos
 - Login/cadastro com senha protegida (scrypt) e sessão em cookie httpOnly. Cada conta tem seus próprios dados (perfil, coleção de figurinhas, grupos).
