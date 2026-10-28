@@ -265,3 +265,40 @@
 .fx-prev { width: 100%; height: 56px; border-radius: 8px; overflow: hidden; display: grid; place-items: center; color: var(--text-3); background: linear-gradient(135deg, #1a1446, #3a0a4e); }
 .fx-prev img { width: 100%; height: 100%; object-fit: cover; }
 @media (prefers-reduced-motion: reduce) { .pc-fx { display: none; } }
+
+/* =========================================================
+   TEMAS COMPLETOS DE PERFIL
+   ========================================================= */
+.bnr-rubro { background: #0d0809 url("/img/theme/rubro-banner.svg") right center / cover no-repeat; }
+.pt .pc-banner { height: 124px; }
+.pt .pc-head { margin-top: -50px; align-items: flex-end; gap: 10px; padding: 0 16px 0 30px; }
+.pt-badges { margin-left: auto; margin-bottom: 4px; display: flex; gap: 3px; padding: 5px 7px; border-radius: 12px; background: rgba(0,0,0,.42); box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); position: relative; z-index: 3; }
+.pt-badges img { width: 24px; height: 26px; display: block; transition: transform .15s; }
+.pt-badges img:hover { transform: translateY(-2px) scale(1.12); }
+.pt-nameplate { position: relative; display: inline-flex; align-self: flex-start; align-items: center; gap: 9px; padding: 5px 22px 5px 12px; margin-bottom: 2px; font: 800 19px/1.2 'Cinzel', Georgia, serif; letter-spacing: .3px; clip-path: polygon(0 0, 100% 0, calc(100% - 12px) 100%, 0 100%); }
+.pt-gem { width: 9px; height: 9px; flex: none; transform: rotate(45deg); }
+
+/* Dragão Rubro */
+.profile-card.pt-rubro { background: linear-gradient(#171012, #0f0b0c); color: #f3e9ea; box-shadow: 0 0 0 1px rgba(255,31,61,.38), 0 0 26px rgba(255,20,48,.22); animation: rubroGlow 3.2s ease-in-out infinite; }
+@keyframes rubroGlow { 50% { box-shadow: 0 0 0 1px rgba(255,31,61,.55), 0 0 34px rgba(255,20,48,.38); } }
+.pt-rubro .pc-av { background: #151012; }
+.pt-rubro .pc-presence { box-shadow: 0 0 0 4px #151012; }
+.pt-rubro .pc-body { margin: 6px 12px 12px; padding: 12px 14px 14px; border-radius: 14px; background: #1d1518; box-shadow: inset 0 0 0 1px rgba(255,255,255,.04); }
+.pt-rubro .pt-nameplate { color: #fff; background: linear-gradient(90deg, rgba(170,12,32,.75), rgba(60,10,16,.9) 62%, rgba(30,10,14,.6)); text-shadow: 0 0 10px rgba(255,40,60,.55); }
+.pt-rubro .pt-gem { background: #ff1f3d; box-shadow: 0 0 8px #ff1f3d, 0 0 2px #fff inset; animation: rubroGem 1.8s ease-in-out infinite; }
+@keyframes rubroGem { 50% { box-shadow: 0 0 14px #ff3d55, 0 0 2px #fff inset; transform: rotate(45deg) scale(1.15); } }
+.pt-rubro .pc-user { color: #b79ea2; }
+.pt-rubro .pc-section h5 { color: #a8868b; letter-spacing: 1px; }
+.pt-rubro .pc-section p { color: #eadfe0; }
+.pt-rubro .chip { background: #120d0f; box-shadow: inset 0 0 0 1px rgba(255,31,61,.28); color: #f1e4e6; }
+.pt-rubro .pc-activity { background: linear-gradient(135deg, rgba(200,16,43,.22), rgba(60,8,16,.35)); box-shadow: inset 0 0 0 1px rgba(255,31,61,.3); }
+.pt-rubro .btn-primary { background: linear-gradient(#e0233c, #a60f24); box-shadow: 0 0 0 1px #ff4d5e inset, 0 0 14px rgba(255,20,48,.45); color: #fff; }
+.pt-rubro .btn-ghost { background: #2a2a30; color: #eee; box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); }
+
+/* prévias na galeria de temas */
+.theme-opt .theme-prev { position: relative; width: 100%; height: 74px; border-radius: 10px; overflow: visible; }
+.theme-prev.none { display: grid; place-items: center; background: var(--bg-3, #1a1d2e); color: var(--text-3); }
+.theme-prev > .bnr { position: absolute; inset: 0; border-radius: 10px; }
+.theme-prev > .av { position: absolute; left: 12px; bottom: 8px; }
+.theme-prev.pt-rubro { box-shadow: 0 0 0 1px rgba(255,31,61,.45), 0 0 14px rgba(255,20,48,.3); }
+@media (prefers-reduced-motion: reduce) { .profile-card.pt-rubro, .pt-rubro .pt-gem { animation: none; } }

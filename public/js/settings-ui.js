@@ -6,7 +6,7 @@ import { api } from './api.js';
 import { settings, updateSettings, CAMERA_PRESETS, SCREEN_RESOLUTIONS } from './call/settings.js';
 import { listDevices, cleanLabel } from './call/media.js';
 import { keyLabel } from './call/sounds.js';
-import { AVATARS, BANNERS, DECOS, EFFECTS, COS_CATS } from './cosmetics.js';
+import { AVATARS, BANNERS, DECOS, EFFECTS, THEMES, COS_CATS } from './cosmetics.js';
 import { cropImage } from './cropper.js';
 
 const PROFILE_COLORS = ['#ff4fa3', '#f72585', '#ff6b6b', '#ffb84c', '#5ce1a0', '#38d6ff', '#3d8bff', '#7b5cff'];
@@ -57,6 +57,7 @@ function accountPane(app) {
     frame: me.frame || 'none',
     deco: me.deco || 'none',
     effect: me.effect || 'none',
+    theme: me.theme || 'none',
     favoriteGames: [...(me.favoriteGames || [])],
     showActivity: me.showActivity !== false,
   };
@@ -132,6 +133,17 @@ function accountPane(app) {
   const effectsG = gallery(EFFECTS, (x) => el('button', { class: `cos-opt ${draft.effect === x.id ? 'active' : ''}`, title: x.name, onclick: () => { draft.effect = x.id; effectsG.paint(); renderPreview(); } },
     el('div', { class: 'fx-prev' }, x.id !== 'none' ? el('img', { src: `/img/fx/${x.id}.svg`, alt: '' }) : '—'), el('small', {}, x.name)));
   effectsG.grid.classList.add('wide');
+  // Temas completos (um clique aplica fundo + decoração + nameplate + badges)
+  const themesG = gallery(THEMES, (t) => el('button', { class: `cos-opt theme-opt ${draft.theme === t.id ? 'active' : ''}`, title: t.name, onclick: () => {
+    draft.theme = t.id;
+    if (t.deco) { draft.deco = t.deco; draft.frame = 'none'; }
+    if (t.banner) draft.bannerUrl = t.banner;
+    themesG.paint(); decosG.paint(); bannersG.paint(); framesG.paint(); renderPreview();
+  } },
+    t.id === 'none' ? el('div', { class: 'theme-prev none' }, '—')
+      : el('div', { class: `theme-prev pt-${t.id}` }, el('div', { class: `bnr bnr-${t.banner.slice(6)}` }), avatar({ ...current(), frame: 'none', deco: t.deco }, 40)),
+    el('small', {}, t.name)));
+  themesG.grid.classList.add('wide');
 
   // Jogos favoritos
   const chips = el('div', { class: 'chips' });
@@ -203,6 +215,7 @@ function accountPane(app) {
             el('div', { class: 'field' }, el('span', {}, 'Cor do nome/avatar'), swatches(PROFILE_COLORS, 'color')),
             el('div', { class: 'field' }, el('span', {}, 'Cor do banner'), swatches(BANNER_COLORS, 'bannerColor'))
           ),
+          el('div', { class: 'field' }, el('span', {}, '🎴 Tema de perfil completo (fundo, decoração, nameplate e badges de uma vez)'), themesG.node),
           el('div', { class: 'field' }, el('span', {}, '🧑‍🎤 Avatares prontos (ou envie sua foto em "Trocar foto")'), avatarsG.node),
           el('div', { class: 'field' }, el('span', {}, '🌌 Fundo do perfil animado (ou envie uma imagem em "Imagem do banner")'), bannersG.node),
           el('div', { class: 'field' }, el('span', {}, '💫 Moldura em volta da foto'), frames),

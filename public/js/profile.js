@@ -1,5 +1,5 @@
 // Cartão de perfil (aparece ao clicar em alguém) e prévia na edição do perfil.
-import { applyBanner } from './cosmetics.js';
+import { applyBanner, THEME_BY_ID } from './cosmetics.js';
 import { el, icon, avatar, contextMenu, closeMenu, timeAgo, toast } from './ui.js';
 import { gameEmoji } from './gamesdata.js';
 
@@ -13,14 +13,19 @@ export function profileCard(app, user, { preview = false } = {}) {
   const banner = el('div', { class: 'pc-banner' });
   applyBanner(banner, user);
   const act = user.activity && online;
-  return el('div', { class: 'profile-card' },
+  const theme = user.theme && user.theme !== 'none' ? THEME_BY_ID[user.theme] : null;
+  const name = theme
+    ? el('div', { class: 'pt-nameplate' }, el('i', { class: 'pt-gem' }), el('span', {}, user.displayName))
+    : el('div', { class: 'pc-name', style: { color: user.color } }, user.displayName);
+  return el('div', { class: `profile-card ${theme ? 'pt pt-' + theme.id : ''}` },
     banner,
     user.effect && user.effect !== 'none' ? el('img', { class: 'pc-fx', src: `/img/fx/${user.effect}.svg`, alt: '' }) : null,
     el('div', { class: 'pc-head' },
       el('div', { class: 'pc-av' }, avatar(user, 88), el('span', { class: `pc-presence ${online ? 'on' : ''}` })),
+      theme?.badges ? el('div', { class: 'pt-badges' }, theme.badges.map(([b, label]) => el('img', { src: `/img/badge/${theme.id}-${b}.svg`, alt: label, title: label }))) : null,
     ),
     el('div', { class: 'pc-body' },
-      el('div', { class: 'pc-name', style: { color: user.color } }, user.displayName),
+      name,
       el('div', { class: 'pc-user' }, '@' + (user.username || 'voce')),
       user.statusText ? el('div', { class: 'pc-status' }, user.statusText) : null,
       act

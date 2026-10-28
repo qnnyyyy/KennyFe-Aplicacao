@@ -17,7 +17,7 @@ export const BANNERS = [
   ['kawaii', 'Kawaii', 'geek'], ['comic', 'HQ', 'geek'], ['ocean', 'Mar pirata', 'anime'], ['galaxy', 'Galáxia', 'geek'],
   ['synthwave', 'Synthwave', 'jogos'], ['arcade', 'Arcade 8-bit', 'jogos'], ['matrix', 'Código', 'jogos'], ['blocks', 'Blocos caindo', 'jogos'],
   ['fps', 'Mira e radar', 'jogos'], ['zone', 'Zona fechando', 'jogos'], ['space', 'Velocidade da luz', 'jogos'], ['racing', 'Corrida', 'jogos'],
-  ['rpg', 'Floresta RPG', 'jogos'], ['cyber', 'Cidade cyberpunk', 'jogos'], ['lava', 'Lava', 'jogos'], ['craft', 'Mundo de blocos', 'jogos'],
+  ['rubro', 'Dragão Rubro', 'jogos'], ['rpg', 'Floresta RPG', 'jogos'], ['cyber', 'Cidade cyberpunk', 'jogos'], ['lava', 'Lava', 'jogos'], ['craft', 'Mundo de blocos', 'jogos'],
 ].map(([id, name, cat]) => ({ id, name, cat }));
 
 export const FRAMES = [
@@ -35,7 +35,7 @@ export const FRAMES = [
 // layers: 'f' = só na frente da foto, 'b' = só atrás, 'fb' = frente + atrás (<id>-back.svg)
 export const DECOS = [
   ['none', 'Nenhuma', 'basico', 'f'],
-  ['x-dragon', 'Dragão sombrio', 'jogos', 'fb'], ['x-dragon-fly', 'Dragão dando a volta', 'jogos', 'fb'], ['x-dragon-east', 'Dragão oriental', 'anime', 'f'],
+  ['x-dragon', 'Dragões Rubros', 'jogos', 'fb'], ['x-dragon-fly', 'Dragão Rubro dando a volta', 'jogos', 'fb'], ['x-dragon-east', 'Dragão oriental', 'anime', 'f'],
   ['x-aura-water', 'Aura de água', 'anime', 'fb'], ['x-aura-fire', 'Aura de fogo', 'anime', 'fb'], ['x-aura-chakra', 'Aura de chakra', 'anime', 'fb'],
   ['x-aura-sharingan', 'Aura sharingan', 'anime', 'fb'], ['x-aura-golden', 'Aura dourada', 'anime', 'fb'], ['x-aura-nature', 'Aura da natureza', 'anime', 'fb'],
   ['x-crows', 'Bando de corvos', 'anime', 'fb'], ['x-fox9', 'Raposa de nove caudas', 'anime', 'fb'], ['x-serpent', 'Serpente sombria', 'anime', 'fb'],
@@ -61,3 +61,13 @@ export function applyBanner(node, user) {
   else if (b) node.style.background = `center / cover no-repeat url("${b}")`;
   else node.style.background = `linear-gradient(135deg, ${user?.bannerColor || '#ff3d9a'}, color-mix(in srgb, ${user?.bannerColor || '#ff3d9a'} 45%, #3d7bff))`;
 }
+
+// Temas completos: aplicam fundo, decoração, nameplate, badges e o visual do cartão de uma vez
+export const THEMES = [
+  { id: 'none', name: 'Sem tema', cat: 'basico' },
+  {
+    id: 'rubro', name: 'Dragão Rubro', cat: 'jogos', deco: 'x-dragon', banner: 'theme:rubro',
+    badges: [['olho', 'Olho do Dragão'], ['garra', 'Garra'], ['chama', 'Chama'], ['escama', 'Escama de Ferro'], ['coroa', 'Coroa']],
+  },
+];
+export const THEME_BY_ID = Object.fromEntries(THEMES.map((t) => [t.id, t]));

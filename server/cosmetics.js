@@ -2,10 +2,11 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const AV_DIR = path.join(__dirname, '..', 'public', 'img', 'av');
-const BANNERS = ['kenfeh', 'ninja', 'tomoe', 'sakura', 'ki', 'village', 'magic', 'mecha', 'kawaii', 'comic', 'ocean', 'galaxy', 'synthwave', 'arcade', 'matrix', 'blocks', 'fps', 'zone', 'space', 'racing', 'rpg', 'cyber', 'lava', 'craft'];
+const BANNERS = ['kenfeh', 'ninja', 'tomoe', 'sakura', 'ki', 'village', 'magic', 'mecha', 'kawaii', 'comic', 'ocean', 'galaxy', 'synthwave', 'arcade', 'matrix', 'blocks', 'fps', 'zone', 'space', 'racing', 'rubro', 'rpg', 'cyber', 'lava', 'craft'];
 const FRAMES = ['none', 'neon', 'rgb', 'fire', 'ice', 'gold', 'legend', 'rainbow', 'toxic', 'galaxy', 'pixel', 'arcade', 'glitch', 'electric', 'matrix', 'hud', 'zone', 'lava', 'ocean', 'heart', 'tomoe', 'pinwheel', 'crows', 'chakra', 'leaves', 'shuriken', 'ki', 'orbs', 'sakura', 'butterflies', 'magic', 'void', 'shadow', 'bats', 'flames', 'stars8', 'kawaii'];
 const DECOS = ['none', 'x-dragon', 'x-dragon-fly', 'x-dragon-east', 'x-aura-water', 'x-aura-fire', 'x-aura-chakra', 'x-aura-sharingan', 'x-aura-golden', 'x-aura-nature', 'x-crows', 'x-fox9', 'x-serpent', 'x-ninja', 'x-sakura', 'x-crown', 'x-angel', 'x-demon'];
+const THEMES = ['none', 'rubro'];
 const EFFECTS = ['none', 'crows', 'sakura', 'leaves', 'snow', 'embers', 'hearts', 'bubbles', 'stars', 'pixels', 'bats', 'lightning'];
 const validAvatar = (u) => typeof u === 'string' && (u.startsWith('/uploads/') || (/^\/img\/av\/[a-z0-9-]+\.svg$/.test(u) && fs.existsSync(path.join(AV_DIR, path.basename(u)))));
 const validBanner = (u) => typeof u === 'string' && (u.startsWith('/uploads/') || (u.startsWith('theme:') && BANNERS.includes(u.slice(6))));
-module.exports = { BANNERS, FRAMES, DECOS, EFFECTS, validAvatar, validBanner };
+module.exports = { BANNERS, FRAMES, DECOS, EFFECTS, THEMES, validAvatar, validBanner };
