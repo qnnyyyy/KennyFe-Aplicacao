@@ -1363,3 +1363,25 @@ kbd { min-width: 170px; padding: 5px 10px; border-radius: 8px; background: rgba(
 #msg-input::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 a.side-nav { text-decoration: none; } .side-nav > span.pc-only-pill { flex: none; margin-left: 0; }
 a.btn { text-decoration: none; color: inherit; }
+
+/* ----- Modo Coop: trocar teclas ----- */
+.tile-coop-keys { position: absolute; left: 10px; top: 10px; z-index: 6; padding: 6px 12px; border-radius: 10px; background: rgba(0,0,0,.65); backdrop-filter: blur(8px); color: #fff; font-size: 12.5px; font-weight: 700; box-shadow: 0 0 0 1px rgba(255,255,255,.18); }
+.tile-coop-keys:hover { background: rgba(61,139,255,.55); }
+.tile.capturing .tile-coop-keys { opacity: .35; }
+.keymap .km-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 12px; margin: 10px 0 6px; }
+.km-group { padding: 10px 12px; border-radius: 14px; background: rgba(255,255,255,.03); box-shadow: inset 0 0 0 1px var(--line); }
+.km-group h5 { margin: 0 0 6px; font-size: 11.5px; letter-spacing: .5px; text-transform: uppercase; color: var(--text-3); }
+.km-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 0; border-top: 1px solid var(--line); }
+.km-row:first-of-type { border-top: 0; }
+.km-row.capturing { background: rgba(61,139,255,.1); border-radius: 8px; }
+.km-label { font-size: 13px; flex: 1; min-width: 0; }
+.km-keys { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.km-key { display: inline-flex; align-items: center; gap: 4px; min-width: 30px; padding: 3px 8px; border-radius: 7px; background: rgba(255,255,255,.08); box-shadow: inset 0 -2px 0 rgba(0,0,0,.35), inset 0 0 0 1px var(--line-2); font-size: 12px; font-weight: 700; }
+.km-key i { font-style: normal; color: var(--text-3); font-weight: 400; }
+.km-key:hover { background: rgba(255,77,109,.25); }
+.km-add { width: 26px; height: 24px; border-radius: 7px; background: rgba(61,139,255,.18); color: var(--blue); font-weight: 800; }
+.km-capture { padding: 3px 10px; border-radius: 7px; background: var(--blue); color: #fff; font-size: 12px; font-weight: 700; animation: kmPulse 1.2s infinite; }
+@keyframes kmPulse { 50% { opacity: .55; } }
+.km-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; margin-top: 8px; }
+.km-opts .field { grid-column: 1 / -1; }
+@media (max-width: 720px) { .km-opts { grid-template-columns: 1fr; } }

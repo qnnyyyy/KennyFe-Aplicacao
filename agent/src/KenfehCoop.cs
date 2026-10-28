@@ -623,6 +623,17 @@ namespace KenfehCoop
             }
         }
 
+        // dono tirou alguém pelo app: desliga o controle e avisa o site (que corta o acesso do convidado)
+        public static void Kick(int slot)
+        {
+            if (slot < 0 || slot > 3) return;
+            string name = Slots[slot].Name ?? "Jogador " + (slot + 2);
+            PadOff(slot);
+            Slots[slot].Name = null;
+            SendText("kick " + slot);
+            AddLog(name + " foi tirado do jogo.");
+        }
+
         public static void StopAll()
         {
             ReleaseAll();
@@ -635,62 +646,110 @@ namespace KenfehCoop
     // =====================================================================
     //  Interface
     // =====================================================================
+    // Painel com cantos arredondados (os cards da janela)
+    class RoundPanel : Panel
+    {
+        public Color Fill;
+        public Color Border = Color.Empty;
+        public int Radius = 14;
+        public RoundPanel() { DoubleBuffered = true; SetStyle(ControlStyles.SupportsTransparentBackColor | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true); }
+        public static GraphicsPath Path(Rectangle r, int rad)
+        {
+            GraphicsPath p = new GraphicsPath();
+            int d = rad * 2;
+            p.AddArc(r.X, r.Y, d, d, 180, 90);
+            p.AddArc(r.Right - d, r.Y, d, d, 270, 90);
+            p.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90);
+            p.AddArc(r.X, r.Bottom - d, d, d, 90, 90);
+            p.CloseFigure();
+            return p;
+        }
+        protected override void OnPaintBackground(PaintEventArgs e)
+        {
+            e.Graphics.Clear(Parent != null ? (Parent is RoundPanel ? ((RoundPanel)Parent).Fill : Parent.BackColor) : BackColor);
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            Rectangle r = new Rectangle(0, 0, Width - 1, Height - 1);
+            using (GraphicsPath gp = Path(r, Radius))
+            {
+                using (SolidBrush b = new SolidBrush(Fill)) e.Graphics.FillPath(b, gp);
+                if (Border != Color.Empty) using (Pen pen = new Pen(Border)) e.Graphics.DrawPath(pen, gp);
+            }
+        }
+    }
+
     class MainForm : Form
     {
         static readonly Color Bg = Color.FromArgb(9, 11, 20);
-        static readonly Color Card = Color.FromArgb(20, 25, 44);
+        static readonly Color Card = Color.FromArgb(19, 24, 42);
+        static readonly Color Card2 = Color.FromArgb(28, 34, 58);
+        static readonly Color Line = Color.FromArgb(40, 48, 78);
         static readonly Color Text1 = Color.FromArgb(238, 241, 251);
-        static readonly Color Text2 = Color.FromArgb(169, 176, 200);
+        static readonly Color Text2 = Color.FromArgb(150, 158, 186);
         static readonly Color Blue = Color.FromArgb(61, 139, 255);
         static readonly Color Pink = Color.FromArgb(255, 79, 163);
         static readonly Color Green = Color.FromArgb(61, 220, 151);
+        static readonly Color Yellow = Color.FromArgb(255, 204, 77);
         static readonly Color Red = Color.FromArgb(255, 77, 109);
+        static readonly Color[] PlayerColors = { Blue, Pink, Green, Yellow, Color.FromArgb(160, 120, 255) };
 
-        Label codeLbl, siteLbl, padLbl, gameLbl, logLbl;
-        Label[] playerLbls = new Label[5];
+        Label codeLbl, siteDot, siteLbl, padDot, padLbl, gameLbl, logLbl;
+        Label[] pName = new Label[5], pStatus = new Label[5];
+        Button[] pKick = new Button[5];
         Button installBtn;
         System.Windows.Forms.Timer timer;
 
         public MainForm()
         {
             Text = "Kenfeh Coop";
-            ClientSize = new Size(480, 640);
+            ClientSize = new Size(500, 738);
             FormBorderStyle = FormBorderStyle.FixedSingle;
             MaximizeBox = false;
             BackColor = Bg;
             ForeColor = Text1;
             Font = new Font("Segoe UI", 10f);
             StartPosition = FormStartPosition.CenterScreen;
+            DoubleBuffered = true;
             try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
 
-            Panel header = new Panel { Location = new Point(0, 0), Size = new Size(480, 86) };
+            // ---------- topo ----------
+            Panel header = new Panel { Location = new Point(0, 0), Size = new Size(500, 92) };
             header.Paint += (s, e) =>
             {
-                using (LinearGradientBrush br = new LinearGradientBrush(header.ClientRectangle, Color.FromArgb(47, 123, 255), Pink, 0f)) e.Graphics.FillRectangle(br, header.ClientRectangle);
-                e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
-                using (Font f = new Font("Segoe UI", 20f, FontStyle.Bold)) e.Graphics.DrawString("Kenfeh Coop", f, Brushes.White, 22, 14);
-                using (Font f = new Font("Segoe UI", 9.5f)) e.Graphics.DrawString("Seus amigos jogam no seu PC como jogadores separados", f, Brushes.White, 25, 52);
+                Graphics g = e.Graphics;
+                using (LinearGradientBrush br = new LinearGradientBrush(header.ClientRectangle, Color.FromArgb(47, 123, 255), Pink, 0f)) g.FillRectangle(br, header.ClientRectangle);
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
+                using (GraphicsPath gp = RoundPanel.Path(new Rectangle(22, 20, 52, 52), 14)) using (SolidBrush b = new SolidBrush(Color.FromArgb(60, 255, 255, 255))) g.FillPath(b, gp);
+                using (Font f = new Font("Segoe UI Emoji", 22f)) g.DrawString("🎮", f, Brushes.White, 26, 25);
+                using (Font f = new Font("Segoe UI", 19f, FontStyle.Bold)) g.DrawString("Kenfeh Coop", f, Brushes.White, 86, 16);
+                using (Font f = new Font("Segoe UI", 9.5f)) g.DrawString("Seus amigos jogam no seu PC como jogadores separados", f, Brushes.White, 89, 52);
+                using (Font f = new Font("Segoe UI", 8f, FontStyle.Bold)) g.DrawString("v" + Agent.Version, f, Brushes.White, 452, 8);
             };
             Controls.Add(header);
 
-            Panel codeCard = MakeCard(16, 100, 448, 120);
-            codeCard.Controls.Add(MakeLabel("CÓDIGO DE PAREAMENTO — digite no site (Modo Jogo Coop)", 14, 10, 420, Text2, 8.5f, FontStyle.Bold));
-            codeLbl = MakeLabel("", 14, 32, 250, Text1, 30f, FontStyle.Bold);
+            // ---------- 1. conectar ----------
+            RoundPanel c1 = Section(16, 106, 468, 150, "1", "CONECTAR AO SITE");
+            c1.Controls.Add(MakeLabel("No Kenfeh: call → 🕹️ Modo Jogo Coop → digite este código", 46, 34, 410, Text2, 8.5f, FontStyle.Regular));
+            codeLbl = MakeLabel("", 16, 58, 240, Text1, 30f, FontStyle.Bold);
             codeLbl.Height = 56;
-            codeCard.Controls.Add(codeLbl);
-            Button copy = MakeButton("Copiar", 290, 40, 70, Blue);
-            copy.Click += (s, e) => { try { Clipboard.SetText(Agent.PairCode); } catch { } };
-            codeCard.Controls.Add(copy);
-            Button renew = MakeButton("Novo", 366, 40, 66, Card);
+            c1.Controls.Add(codeLbl);
+            Button copy = MakeButton("Copiar", 262, 68, 92, Blue);
+            copy.Click += (s, e) => { try { Clipboard.SetText(Agent.PairCode); copy.Text = "Copiado ✓"; } catch { } };
+            c1.Controls.Add(copy);
+            Button renew = MakeButton("Novo código", 360, 68, 92, Card2);
             renew.Click += (s, e) => Agent.NewCode();
-            codeCard.Controls.Add(renew);
-            Controls.Add(codeCard);
+            c1.Controls.Add(renew);
+            siteDot = MakeLabel("●", 16, 118, 18, Yellow, 10f, FontStyle.Regular);
+            siteLbl = MakeLabel("", 34, 118, 420, Text1, 9.5f, FontStyle.Regular);
+            c1.Controls.Add(siteDot);
+            c1.Controls.Add(siteLbl);
+            Controls.Add(c1);
 
-            Panel status = MakeCard(16, 232, 448, 128);
-            siteLbl = MakeLabel("", 14, 12, 420, Text1, 10f, FontStyle.Regular);
-            padLbl = MakeLabel("", 14, 42, 300, Text1, 10f, FontStyle.Regular);
-            gameLbl = MakeLabel("", 14, 72, 420, Text1, 10f, FontStyle.Regular);
-            installBtn = MakeButton("Ativar controles", 300, 36, 132, Pink);
+            // ---------- 2. seu PC ----------
+            RoundPanel c2 = Section(16, 268, 468, 112, "2", "SEU PC");
+            padDot = MakeLabel("●", 16, 38, 18, Red, 10f, FontStyle.Regular);
+            padLbl = MakeLabel("", 34, 38, 270, Text1, 9.5f, FontStyle.Regular);
+            installBtn = MakeButton("Ativar controles", 318, 32, 134, Pink);
             installBtn.Click += (s, e) =>
             {
                 installBtn.Enabled = false;
@@ -699,30 +758,58 @@ namespace KenfehCoop
                 t.IsBackground = true;
                 t.Start();
             };
-            status.Controls.Add(siteLbl);
-            status.Controls.Add(padLbl);
-            status.Controls.Add(gameLbl);
-            status.Controls.Add(installBtn);
-            status.Controls.Add(MakeLabel("Você continua jogando com o seu teclado, mouse e controle.", 14, 100, 420, Text2, 8.5f, FontStyle.Regular));
-            Controls.Add(status);
+            gameLbl = MakeLabel("", 16, 72, 436, Text2, 9.5f, FontStyle.Regular);
+            c2.Controls.Add(padDot);
+            c2.Controls.Add(padLbl);
+            c2.Controls.Add(installBtn);
+            c2.Controls.Add(gameLbl);
+            Controls.Add(c2);
 
-            Panel players = MakeCard(16, 372, 448, 150);
-            players.Controls.Add(MakeLabel("JOGADORES", 14, 10, 200, Text2, 8.5f, FontStyle.Bold));
+            // ---------- 3. jogadores ----------
+            RoundPanel c3 = Section(16, 392, 468, 254, "3", "JOGADORES");
             for (int i = 0; i < 5; i++)
             {
-                playerLbls[i] = MakeLabel("", 14, 32 + i * 22, 420, Text1, 9.5f, FontStyle.Regular);
-                players.Controls.Add(playerLbls[i]);
+                int idx = i;
+                RoundPanel row = new RoundPanel { Fill = Card2, Radius = 10, Location = new Point(12, 34 + i * 43), Size = new Size(444, 37) };
+                Color pc = PlayerColors[i];
+                Panel badge = new Panel { Location = new Point(8, 6), Size = new Size(25, 25), BackColor = Color.Transparent };
+                badge.Paint += (s, e) =>
+                {
+                    e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                    using (SolidBrush b = new SolidBrush(pc)) e.Graphics.FillEllipse(b, 0, 0, 24, 24);
+                    e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
+                    using (Font f = new Font("Segoe UI", 8.5f, FontStyle.Bold)) { SizeF sz = e.Graphics.MeasureString("J" + (idx + 1), f); e.Graphics.DrawString("J" + (idx + 1), f, Brushes.White, 12 - sz.Width / 2, 12 - sz.Height / 2); }
+                };
+                row.Controls.Add(badge);
+                pName[i] = MakeLabel("", 42, 9, 196, Text1, 9.5f, FontStyle.Bold);
+                pStatus[i] = MakeLabel("", 240, 10, i == 0 ? 196 : 120, Text2, 8.5f, FontStyle.Regular);
+                row.Controls.Add(pName[i]);
+                row.Controls.Add(pStatus[i]);
+                if (i > 0)
+                {
+                    Button kick = MakeButton("Expulsar", 364, 5, 72, Color.FromArgb(70, 255, 77, 109));
+                    kick.Height = 27;
+                    kick.Font = new Font("Segoe UI", 8.5f, FontStyle.Bold);
+                    kick.Click += (s, e) =>
+                    {
+                        string n = Agent.Slots[idx - 1].Name ?? "esse jogador";
+                        if (MessageBox.Show(this, "Tirar " + n + " do seu jogo? O controle dele é desligado na hora.", "Expulsar jogador", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes) Agent.Kick(idx - 1);
+                    };
+                    pKick[i] = kick;
+                    row.Controls.Add(kick);
+                }
+                c3.Controls.Add(row);
             }
-            Controls.Add(players);
+            Controls.Add(c3);
 
-            logLbl = MakeLabel("", 18, 530, 444, Text2, 8.5f, FontStyle.Regular);
-            logLbl.Height = 52;
+            // ---------- rodapé ----------
+            logLbl = MakeLabel("", 20, 654, 460, Text2, 8.5f, FontStyle.Regular);
+            logLbl.Height = 34;
             Controls.Add(logLbl);
-
-            Button stop = MakeButton("Parar tudo agora", 16, 590, 220, Red);
+            Button stop = MakeButton("🛑  Parar tudo agora", 16, 690, 230, Red);
             stop.Click += (s, e) => Agent.StopAll();
             Controls.Add(stop);
-            Button site = MakeButton("Abrir o Kenfeh", 244, 590, 220, Card);
+            Button site = MakeButton("Abrir o Kenfeh", 254, 690, 230, Card2);
             site.Click += (s, e) => { try { Process.Start("https://kenfeh.shop"); } catch { } };
             Controls.Add(site);
 
@@ -730,7 +817,7 @@ namespace KenfehCoop
             {
                 if (!Agent.BusMissing) return;
                 DialogResult r = MessageBox.Show(this,
-                    "Para seus amigos jogarem como jogadores separados (Jogador 2, 3 e 4), o Kenfeh Coop precisa ativar o controle virtual no seu PC.\n\n" +
+                    "Para seus amigos jogarem como jogadores separados (Jogador 2, 3, 4 e 5), o Kenfeh Coop precisa ativar o controle virtual no seu PC.\n\n" +
                     "Isso é feito uma única vez e já vem dentro deste app — nada para baixar. O Windows vai pedir permissão de administrador.\n\nAtivar agora?",
                     "Kenfeh Coop — ativar controles", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
                 if (r == DialogResult.Yes) installBtn.PerformClick();
@@ -742,32 +829,52 @@ namespace KenfehCoop
             Refresh2();
         }
 
+        RoundPanel Section(int x, int y, int w, int h, string step, string title)
+        {
+            RoundPanel p = new RoundPanel { Fill = Card, Border = Line, Location = new Point(x, y), Size = new Size(w, h) };
+            Panel num = new Panel { Location = new Point(14, 10), Size = new Size(22, 22), BackColor = Color.Transparent };
+            num.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                using (LinearGradientBrush b = new LinearGradientBrush(new Rectangle(0, 0, 22, 22), Blue, Pink, 45f)) e.Graphics.FillEllipse(b, 0, 0, 21, 21);
+                e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
+                using (Font f = new Font("Segoe UI", 8.5f, FontStyle.Bold)) { SizeF sz = e.Graphics.MeasureString(step, f); e.Graphics.DrawString(step, f, Brushes.White, 11 - sz.Width / 2, 11 - sz.Height / 2); }
+            };
+            p.Controls.Add(num);
+            p.Controls.Add(MakeLabel(title, 44, 12, 300, Text2, 8.5f, FontStyle.Bold));
+            return p;
+        }
+
+        static void SetText(Label l, string t, Color c) { if (l.Text != t) l.Text = t; if (l.ForeColor != c) l.ForeColor = c; }
+
         void Refresh2()
         {
-            codeLbl.Text = Agent.PairCode.Substring(0, 3) + " " + Agent.PairCode.Substring(3);
-            if (Agent.ListenError != "") { siteLbl.Text = "●  " + Agent.ListenError; siteLbl.ForeColor = Red; }
-            else if (Agent.SiteConnected) { siteLbl.Text = "●  Site conectado  (" + Agent.SiteOrigin.Replace("https://", "") + ")"; siteLbl.ForeColor = Green; }
-            else { siteLbl.Text = "●  Esperando o site — abra o Modo Jogo Coop e digite o código"; siteLbl.ForeColor = Color.FromArgb(255, 204, 77); }
+            SetText(codeLbl, Agent.PairCode.Substring(0, 3) + " " + Agent.PairCode.Substring(3), Text1);
+            if (Agent.ListenError != "") { SetText(siteDot, "●", Red); SetText(siteLbl, Agent.ListenError, Red); }
+            else if (Agent.SiteConnected) { SetText(siteDot, "●", Green); SetText(siteLbl, "Conectado ao site (" + Agent.SiteOrigin.Replace("https://", "") + ")", Green); }
+            else { SetText(siteDot, "●", Yellow); SetText(siteLbl, "Esperando o site… abra o Modo Jogo Coop e digite o código", Yellow); }
             bool padOk = Agent.VClient != null;
-            padLbl.Text = padOk ? "●  Controles virtuais prontos (até 4)" : "●  Controle virtual: " + Agent.VigemError;
-            padLbl.ForeColor = padOk ? Green : Red;
+            SetText(padDot, "●", padOk ? Green : Red);
+            SetText(padLbl, padOk ? "Controles virtuais prontos (até 4 amigos)" : "Controle virtual: " + Agent.VigemError, padOk ? Text1 : Red);
             installBtn.Visible = !padOk;
-            gameLbl.Text = "Jogo detectado:  " + (Agent.Game == "-" ? "nenhum" : Agent.Game);
-            gameLbl.ForeColor = Text2;
+            SetText(gameLbl, "🎯  Jogo detectado:  " + (Agent.Game == "-" ? "nenhum (abra o jogo)" : Agent.Game), Agent.Game == "-" ? Text2 : Text1);
             bool sharedActive = (DateTime.Now - Agent.SharedInput).TotalSeconds < 2;
-            playerLbls[0].Text = "Jogador 1  —  você (teclado, mouse e controle)" + (sharedActive ? "   + amigo usando seu teclado/mouse" : "");
-            playerLbls[0].ForeColor = Text1;
+            SetText(pName[0], "Você (dono do PC)", Text1);
+            SetText(pStatus[0], sharedActive ? "amigo no seu teclado" : "joga normal (seu teclado/controle)", sharedActive ? Yellow : Text2);
             for (int i = 0; i < 4; i++)
             {
                 Slot s = Agent.Slots[i];
+                bool used = s.Name != null || s.PadConnected;
                 bool active = (DateTime.Now - s.LastInput).TotalSeconds < 1.5;
-                if (s.Name == null && !s.PadConnected) { playerLbls[i + 1].Text = "Jogador " + (i + 2) + "  —  livre"; playerLbls[i + 1].ForeColor = Text2; }
-                else { playerLbls[i + 1].Text = "Jogador " + (i + 2) + "  —  " + (s.Name ?? "amigo") + (active ? "   ● jogando" : "   (parado)"); playerLbls[i + 1].ForeColor = active ? Green : Text1; }
+                SetText(pName[i + 1], used ? (s.Name ?? "Amigo") : "Livre", used ? Text1 : Text2);
+                SetText(pStatus[i + 1], used ? (active ? "● jogando" : "conectado, parado") : "vaga livre", used ? (active ? Green : Text2) : Text2);
+                pKick[i + 1].Visible = used;
             }
             lock (Agent.Log)
             {
                 int n = Agent.Log.Count;
-                logLbl.Text = string.Join("\n", Agent.Log.GetRange(Math.Max(0, n - 3), Math.Min(3, n)).ToArray());
+                string t = string.Join("\n", Agent.Log.GetRange(Math.Max(0, n - 2), Math.Min(2, n)).ToArray());
+                if (logLbl.Text != t) logLbl.Text = t;
             }
         }
 

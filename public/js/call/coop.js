@@ -5,11 +5,30 @@ import { el, icon, toast, modal, sfx, store, save, $, IS_MOBILE } from '../ui.js
 import { api } from '../api.js';
 
 const AGENT_URL = 'ws://localhost:47821';
-// Teclado + mouse do convidado viram um controle de Xbox (o jogo vê um jogador separado)
-const KB_BUTTONS = {
-  Space: 0, KeyF: 1, ShiftLeft: 1, KeyE: 2, KeyR: 3, KeyQ: 4, KeyG: 5, Tab: 8, Enter: 9, Escape: 9,
-  ControlLeft: 10, KeyV: 11, ArrowUp: 12, ArrowDown: 13, ArrowLeft: 14, ArrowRight: 15,
+// Teclado + mouse do convidado viram um controle de Xbox (o jogo vê um jogador separado).
+// Cada convidado pode trocar as teclas (fica salvo no navegador dele).
+export const PAD_ACTIONS = [
+  ['ls_up', 'Analógico esquerdo ↑', 'Andar'], ['ls_down', 'Analógico esquerdo ↓', 'Andar'], ['ls_left', 'Analógico esquerdo ←', 'Andar'], ['ls_right', 'Analógico esquerdo →', 'Andar'],
+  ['rs_up', 'Analógico direito ↑', 'Câmera'], ['rs_down', 'Analógico direito ↓', 'Câmera'], ['rs_left', 'Analógico direito ←', 'Câmera'], ['rs_right', 'Analógico direito →', 'Câmera'],
+  ['b0', 'A', 'Botões'], ['b1', 'B', 'Botões'], ['b2', 'X', 'Botões'], ['b3', 'Y', 'Botões'],
+  ['b4', 'LB', 'Gatilhos'], ['b5', 'RB', 'Gatilhos'], ['lt', 'LT (gatilho esquerdo)', 'Gatilhos'], ['rt', 'RT (gatilho direito)', 'Gatilhos'],
+  ['b12', 'Direcional ↑', 'Direcional'], ['b13', 'Direcional ↓', 'Direcional'], ['b14', 'Direcional ←', 'Direcional'], ['b15', 'Direcional →', 'Direcional'],
+  ['b9', 'Start / Menu', 'Outros'], ['b8', 'Select / View', 'Outros'], ['b10', 'L3 (apertar analógico esq.)', 'Outros'], ['b11', 'R3 (apertar analógico dir.)', 'Outros'],
+];
+export const DEFAULT_KEYMAP = {
+  ls_up: ['KeyW'], ls_down: ['KeyS'], ls_left: ['KeyA'], ls_right: ['KeyD'],
+  rs_up: ['KeyI'], rs_down: ['KeyK'], rs_left: ['KeyJ'], rs_right: ['KeyL'],
+  b0: ['Space'], b1: ['KeyF', 'ShiftLeft'], b2: ['KeyE'], b3: ['KeyR'], b4: ['KeyQ'], b5: ['KeyG'],
+  lt: ['Mouse2', 'KeyZ'], rt: ['Mouse0', 'KeyC'],
+  b8: ['Tab'], b9: ['Enter', 'Escape'], b10: ['ControlLeft'], b11: ['KeyV', 'Mouse1'],
+  b12: ['ArrowUp'], b13: ['ArrowDown'], b14: ['ArrowLeft'], b15: ['ArrowRight'],
 };
+export const keymap = () => ({ ...DEFAULT_KEYMAP, ...(store('coop-keymap', null) || {}) });
+const KEY_NAMES = { Space: 'Espaço', ShiftLeft: 'Shift', ShiftRight: 'Shift dir.', ControlLeft: 'Ctrl', ControlRight: 'Ctrl dir.', AltLeft: 'Alt', AltRight: 'AltGr', Escape: 'Esc', Enter: 'Enter', Tab: 'Tab', Backspace: '⌫', CapsLock: 'Caps', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Mouse0: '🖱️ esquerdo', Mouse1: '🖱️ meio', Mouse2: '🖱️ direito', Mouse3: '🖱️ lateral 1', Mouse4: '🖱️ lateral 2' };
+// nome da tecla no teclado da pessoa (ABNT, US…), quando o navegador informa
+let LAYOUT = null;
+navigator.keyboard?.getLayoutMap?.().then((m) => (LAYOUT = m)).catch(() => {});
+export const keyName = (c) => KEY_NAMES[c] || LAYOUT?.get(c)?.toUpperCase() || c.replace(/^Key|^Digit/, '').replace(/^Numpad/, 'Num ');
 export const KB_LEGEND = [
   ['WASD', 'analógico esquerdo'], ['Mouse', 'analógico direito (câmera)'], ['Espaço', 'A'], ['F / Shift', 'B'], ['E', 'X'], ['R', 'Y'],
   ['Q / G', 'LB / RB'], ['Botão dir. / Z', 'LT'], ['Botão esq. / C', 'RT'], ['Setas', 'direcional'], ['Enter / Esc', 'Start'], ['Tab', 'Select'], ['Ctrl / V', 'L3 / R3'],
@@ -78,6 +97,8 @@ export class CoopController {
         });
         if (!silent) toast('🕹️ App Kenfeh Coop conectado!', 'success');
         if (this.hosting) this.sendAgent(`mon ${this.hosting.monitor}`);
+        // app reaberto: manda de novo o nome de quem já está jogando
+        for (const g of this.guests.values()) if (g.status === 'playing') this.sendAgent(`label ${g.slot} ${this.guestName(g)}`);
       } else if (cmd === 'err') {
         this.agentState = 'off';
         save('agent-code', null);
@@ -86,6 +107,14 @@ export class CoopController {
       } else if (cmd === 'stop') {
         this.revokeAll();
         toast('🛑 Você parou tudo pelo app Kenfeh Coop.', 'success');
+      } else if (cmd === 'kick') {
+        // o dono tirou alguém pela janela do app
+        const slot = Number(rest[0]);
+        const entry = [...this.guests.entries()].find(([, g]) => g.status === 'playing' && g.slot === slot);
+        if (entry) {
+          toast(`${this.guestName(entry[1])} foi tirado do jogo pelo app.`, 'info');
+          this.revoke(entry[0]);
+        }
       } else if (cmd === 'game') {
         this.onGameDetected(rest.join(' '));
       }
@@ -157,11 +186,16 @@ export class CoopController {
     if (slot < 0) return toast('Máximo de 4 jogadores convidados.', 'error');
     g.status = 'playing';
     g.slot = slot;
-    const name = this.app.userName(g.userId).replace(/\s+/g, ' ').slice(0, 30);
+    const name = this.guestName(g);
     this.sendAgent(`label ${slot} ${name}`);
     this.call.pm.sendData(peerId, { t: 'coop-grant', screenId: this.hosting.screenId, perms: this.hosting.perms, slot });
     toast(`${name} entrou no seu jogo como Jogador ${slot + 2} 🎮 (Ctrl+Shift+X corta o controle)`, 'success', 5000);
     this.refreshDialog?.();
+  }
+
+  // nome no Kenfeh = nome que aparece no app do PC
+  guestName(g) {
+    return this.app.userName(g.userId).replace(/\s+/g, ' ').trim().slice(0, 30) || 'Amigo';
   }
 
   deny(peerId) {
@@ -174,6 +208,7 @@ export class CoopController {
     const g = this.guests.get(peerId);
     if (!g) return;
     this.releaseGuest(g);
+    if (g.status === 'playing' && g.slot >= 0) this.sendAgent(`padoff ${g.slot}`);
     this.guests.delete(peerId);
     this.call.pm?.sendData(peerId, { t: 'coop-revoke' });
     this.refreshDialog?.();
@@ -232,7 +267,7 @@ export class CoopController {
         this.pending.delete(`${peerId}:${m.screenId}`);
         this.controlling = { peerId, screenId: m.screenId, perms: m.perms || {}, slot: m.slot };
         sfx('join');
-        toast('🎮 Liberado! Clique no vídeo para começar a jogar. Ctrl+Shift+Q para sair.', 'success', 6000);
+        toast(m.perms?.mode === 'shared' ? '🎮 Liberado! Clique no vídeo para começar a jogar. Ctrl+Shift+Q para sair.' : `🎮 Liberado! Você é o Jogador ${m.slot + 2}. Clique no vídeo para jogar — "⌨️ Configurar teclas" no bloco troca os botões. Ctrl+Shift+Q sai.`, 'success', 7000);
         this.call.refreshTiles();
         return;
       case 'coop-deny':
@@ -316,24 +351,30 @@ export class CoopController {
     const padMode = c.perms.mode !== 'shared';
     this.padKeys = new Set();
     this.padMouse = new Set();
+    this.keymap = keymap();
     this.rs = [0, 0];
+    // botão para trocar as teclas (só no modo controle)
+    if (padMode) {
+      this.keysBtn = el('button', { class: 'tile-coop-keys', title: 'Trocar quais teclas viram quais botões do controle', onclick: (e) => { e.stopPropagation(); this.openKeymap(); } }, '⌨️ Configurar teclas');
+      tile.el.append(this.keysBtn);
+    }
     tile.coopHint.textContent = padMode
       ? `🎮 Você é o Jogador ${c.slot + 2} — clique no vídeo para jogar (teclado e mouse viram controle) • Esc solta • Ctrl+Shift+Q sai`
       : '🎮 Jogando no teclado/mouse do host — clique no vídeo • Esc solta o mouse • Ctrl+Shift+Q sai';
     const relative = padMode || c.perms.mouseMode === 'rel';
     const useMouse = padMode || c.perms.mouse;
     const onDown = (e) => {
-      if (e.target.closest('.tile-actions, .tile-coop')) return;
+      if (e.target.closest('.tile-actions, .tile-coop, .tile-coop-keys')) return;
       this.setActive(true);
       if (useMouse && relative && document.pointerLockElement !== v) v.requestPointerLock?.();
       if (!useMouse) return;
       e.preventDefault();
-      if (padMode) this.padMouse.add(e.button);
+      if (padMode) this.padKeys.add('Mouse' + e.button);
       else this.send({ t: 'mb', b: e.button, d: 1 });
     };
     const onUp = (e) => {
       if (!this.active || !useMouse) return;
-      if (padMode) this.padMouse.delete(e.button);
+      if (padMode) this.padKeys.delete('Mouse' + e.button);
       else this.send({ t: 'mb', b: e.button, d: 0 });
     };
     const onMove = (e) => {
@@ -404,6 +445,8 @@ export class CoopController {
     if (!this.boundTile) return;
     cancelAnimationFrame(this.raf);
     this.unbinders?.();
+    this.keysBtn?.remove();
+    this.keysBtn = null;
     this.setActive(false);
     if (document.pointerLockElement) document.exitPointerLock();
     this.boundTile = null;
@@ -458,27 +501,29 @@ export class CoopController {
     }
     if (withKeyboard && this.active) {
       const k = this.padKeys;
-      for (const code of k) if (KB_BUTTONS[code] !== undefined) mask |= 1 << KB_BUTTONS[code];
-      // WASD -> analógico esquerdo (diagonal normalizada)
-      let kx = (k.has('KeyD') ? 1 : 0) - (k.has('KeyA') ? 1 : 0);
-      let ky = (k.has('KeyW') ? 1 : 0) - (k.has('KeyS') ? 1 : 0);
+      const map = this.keymap || DEFAULT_KEYMAP;
+      const on = (a) => (map[a] || []).some((c) => k.has(c)) ? 1 : 0;
+      for (let b = 0; b < 16; b++) if (on('b' + b)) mask |= 1 << b;
+      // teclas do analógico esquerdo (padrão WASD), diagonal normalizada
+      let kx = on('ls_right') - on('ls_left');
+      let ky = on('ls_up') - on('ls_down');
       if (kx && ky) { kx *= 0.7071; ky *= 0.7071; }
       if (kx || ky) { lx = kx; ly = ky; }
-      // IJKL -> analógico direito
-      const ix = (k.has('KeyL') ? 1 : 0) - (k.has('KeyJ') ? 1 : 0);
-      const iy = (k.has('KeyI') ? 1 : 0) - (k.has('KeyK') ? 1 : 0);
+      // teclas do analógico direito (padrão IJKL)
+      const ix = on('rs_right') - on('rs_left');
+      const iy = on('rs_up') - on('rs_down');
       // mouse -> analógico direito (velocidade do mouse vira inclinação do stick)
-      const sens = store('coop-mouse-sens', 1) * 0.045;
-      const tx = Math.max(-1, Math.min(1, (this.acc.x / dt) * sens * 16));
-      const ty = Math.max(-1, Math.min(1, (-this.acc.y / dt) * sens * 16));
+      const look = store('coop-mouse-look', true);
+      const sens = store('coop-mouse-sens', 1) * 0.045 * (store('coop-invert-y', false) ? -1 : 1);
+      const tx = look ? Math.max(-1, Math.min(1, (this.acc.x / dt) * Math.abs(sens) * 16)) : 0;
+      const ty = look ? Math.max(-1, Math.min(1, (-this.acc.y / dt) * sens * 16)) : 0;
       this.acc = { x: 0, y: 0 };
       this.rs = [this.rs[0] * 0.55 + tx * 0.45, this.rs[1] * 0.55 + ty * 0.45];
       if (Math.abs(this.rs[0]) < 0.02) this.rs[0] = 0;
       if (Math.abs(this.rs[1]) < 0.02) this.rs[1] = 0;
       if (ix || iy) { rx = ix; ry = iy; } else if (this.rs[0] || this.rs[1]) { rx = this.rs[0]; ry = this.rs[1]; }
-      if (this.padMouse.has(2) || k.has('KeyZ')) lt = 1;
-      if (this.padMouse.has(0) || k.has('KeyC')) rt = 1;
-      if (this.padMouse.has(1)) mask |= 1 << 11;
+      if (on('lt')) lt = 1;
+      if (on('rt')) rt = 1;
     }
     if (!gp && !withKeyboard) return;
     const s = [mask, Math.round(lx * 32767), Math.round(ly * 32767), Math.round(rx * 32767), Math.round(ry * 32767), Math.round(lt * 255), Math.round(rt * 255)];
@@ -489,6 +534,77 @@ export class CoopController {
       this.lastPad = key;
       this.lastPadAt = now;
     }
+  }
+
+  // =================== TROCAR TECLAS (convidado) ===================
+  openKeymap() {
+    this.setActive(false);
+    if (document.pointerLockElement) document.exitPointerLock();
+    let map = keymap();
+    let capturing = null; // ação esperando uma tecla
+    const body = el('div', { class: 'keymap' });
+    const save2 = () => {
+      save('coop-keymap', map);
+      this.keymap = map;
+    };
+    const stopCapture = () => {
+      capturing = null;
+      window.removeEventListener('keydown', onCapKey, true);
+      window.removeEventListener('mousedown', onCapMouse, true);
+    };
+    const assign = (code) => {
+      const a = capturing;
+      stopCapture();
+      // a mesma tecla não pode fazer duas coisas: sai da ação antiga
+      for (const [k, list] of Object.entries(map)) if (k !== a && list.includes(code)) {
+        map[k] = list.filter((c) => c !== code);
+        toast(`"${keyName(code)}" saiu de ${PAD_ACTIONS.find((x) => x[0] === k)?.[1] || k}.`, 'info', 2500);
+      }
+      map[a] = [...new Set([...(map[a] || []), code])].slice(-3);
+      save2();
+      render();
+    };
+    const onCapKey = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      assign(e.code);
+    };
+    const onCapMouse = (e) => {
+      if (!e.target.closest('.km-capture')) return;
+      e.preventDefault();
+      e.stopPropagation();
+      assign('Mouse' + e.button);
+    };
+    const groups = [...new Set(PAD_ACTIONS.map((a) => a[2]))];
+    const render = () => {
+      body.replaceChildren(
+        el('p', { class: 'muted small' }, 'Clique em "+" e aperte a tecla (ou o botão do mouse) que você quer usar. Cada ação aceita até 3 teclas. Fica salvo neste navegador.'),
+        el('div', { class: 'km-grid' }, groups.map((gname) => el('div', { class: 'km-group' },
+          el('h5', {}, gname),
+          ...PAD_ACTIONS.filter((a) => a[2] === gname).map(([id, label]) => el('div', { class: `km-row ${capturing === id ? 'capturing' : ''}` },
+            el('span', { class: 'km-label' }, label),
+            el('div', { class: 'km-keys' },
+              ...(map[id] || []).map((c) => el('button', { class: 'km-key', title: 'Clique para tirar', onclick: () => { map[id] = map[id].filter((x) => x !== c); save2(); render(); } }, keyName(c), el('i', {}, '×'))),
+              capturing === id
+                ? el('button', { class: 'km-capture', oncontextmenu: (e) => e.preventDefault() }, 'aperte uma tecla…')
+                : el('button', { class: 'km-add', title: 'Adicionar tecla', onclick: () => { stopCapture(); capturing = id; window.addEventListener('keydown', onCapKey, true); window.addEventListener('mousedown', onCapMouse, true); render(); } }, '+'))))))),
+        el('div', { class: 'km-opts' },
+          el('label', { class: 'switch-row' }, el('input', { type: 'checkbox', checked: store('coop-mouse-look', true), onchange: (e) => save('coop-mouse-look', e.target.checked) }), el('span', { class: 'switch' }), el('div', {}, el('b', {}, 'Mouse mexe a câmera (analógico direito)'), el('small', {}, 'Desligue se o jogo não usa câmera.'))),
+          el('label', { class: 'switch-row' }, el('input', { type: 'checkbox', checked: store('coop-invert-y', false), onchange: (e) => save('coop-invert-y', e.target.checked) }), el('span', { class: 'switch' }), el('div', {}, el('b', {}, 'Inverter o eixo vertical do mouse'), el('small', {}, 'Para quem joga com "câmera invertida".'))),
+          el('label', { class: 'field' }, el('span', {}, 'Sensibilidade do mouse'), el('input', { type: 'range', min: 0.3, max: 3, step: 0.1, value: store('coop-mouse-sens', 1), oninput: (e) => save('coop-mouse-sens', Number(e.target.value)) })))
+      );
+    };
+    render();
+    modal({
+      title: '⌨️ Suas teclas no Modo Coop',
+      wide: true,
+      content: body,
+      onClose: stopCapture,
+      actions: [
+        { label: 'Restaurar padrão', onClick: () => { map = { ...DEFAULT_KEYMAP }; save('coop-keymap', null); this.keymap = keymap(); stopCapture(); render(); toast('Teclas voltaram ao padrão.', 'success'); } },
+        { label: 'Pronto', primary: true, onClick: (c) => { stopCapture(); c(); toast('Teclas salvas! Clique no vídeo para voltar a jogar.', 'success'); } },
+      ],
+    });
   }
 
   stopControl(notify = true) {
