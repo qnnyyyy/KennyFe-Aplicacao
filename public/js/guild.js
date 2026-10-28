@@ -160,7 +160,7 @@ export function channelDialog(app, g, ch, kind = ch?.kind || 'text') {
   const sw = (label, desc, key) => el('label', { class: 'switch-row' }, el('input', { type: 'checkbox', checked: st[key], onchange: (e) => { st[key] = e.target.checked; render(); } }), el('span', { class: 'switch' }), el('div', {}, el('b', {}, label), el('small', {}, desc)));
   const render = () => {
     emojiBtn.replaceChildren(st.emoji || (st.kind === 'voice' ? '🔊' : '#'));
-    body.replaceChildren(
+    body.replaceChildren(...[
       isNew ? el('div', { class: 'kind-pick' },
         ['text', 'voice'].map((k) => el('button', { class: `kind-card ${st.kind === k ? 'active' : ''}`, onclick: () => { st.kind = k; render(); } },
           el('span', { class: 'kind-ic' }, k === 'voice' ? '🔊' : '#'),
@@ -177,7 +177,7 @@ export function channelDialog(app, g, ch, kind = ch?.kind || 'text') {
               ? el('div', { class: 'role-picks' }, g.roles.map((r) => el('button', { class: `role-pick ${st.allowRoles.has(r.id) ? 'on' : ''}`, style: { '--rc': r.color }, onclick: () => { st.allowRoles.has(r.id) ? st.allowRoles.delete(r.id) : st.allowRoles.add(r.id); render(); } }, el('i'), r.name)))
               : el('p', { class: 'muted small' }, 'Crie classes em Configurações do grupo → Classes para liberar só para algumas pessoas.'))
         : null
-    );
+    ].filter(Boolean));
   };
   render();
   const submit = async (close) => {

@@ -1528,3 +1528,12 @@ input[type=range]::-webkit-slider-thumb { background: #fff; box-shadow: 2px 2px 
 .mb-vol-label { min-width: 34px; font-size: 11.5px; color: rgba(255,255,255,.75); font-variant-numeric: tabular-nums; }
 .mb-ios { font-size: 11px; color: rgba(255,255,255,.55); }
 @container (max-width: 460px) { .mb-range { width: 64px; } .mb-ios { display: none; } }
+.auth-card, .modal { overflow: hidden; }
+/* itens selecionados no rosa da marca */
+.kind-card.active, .choice.active, .tt-skin.active { box-shadow: inset 0 0 0 2px var(--pink), 3px 3px 0 var(--cyan); background: rgba(255,61,154,.1); }
+.settings-nav button.active, .role-item.active, .cmd-row.sel, .cmd-row:hover { background: rgba(255,61,154,.14); }
+.settings-nav button.active { box-shadow: inset 3px 0 0 var(--pink); }
+.role-pick.on { box-shadow: inset 0 0 0 2px var(--rc), 2px 2px 0 var(--cyan); }
+.poll-opt.mine { box-shadow: inset 0 0 0 2px var(--pink); }
+.poll-opt i { background: rgba(255,61,154,.22); }
+.status-pill.on { box-shadow: 2px 2px 0 rgba(41,217,255,.5); }
