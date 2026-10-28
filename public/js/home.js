@@ -80,6 +80,7 @@ export class Home {
       el('button', { class: `side-nav ${onHome && this.page === 'friends' ? 'active' : ''}`, onclick: () => this.go('friends') }, icon('users', 18), el('span', {}, 'Amigos'), this.pending.length ? el('span', { class: 'count-badge' }, this.pending.length) : null),
       ...(app.me.isAdmin ? [el('button', { class: `side-nav ${onHome && this.page === 'admin' ? 'active' : ''}`, onclick: () => this.go('admin') }, el('span', { class: 'ic' }, '📊'), el('span', {}, 'Painel do site'))] : []),
       el('button', { class: 'side-nav', onclick: () => this.newGroupDialog('create') }, icon('plus', 18), el('span', {}, 'Criar grupo')),
+      el('a', { class: 'side-nav', href: '/coop', target: '_blank', rel: 'noopener' }, icon('download', 18), el('span', {}, 'Baixar app Coop'), el('span', { class: 'pc-only-pill' }, '💻 PC')),
       el('div', { class: 'sidebar-section with-action' }, el('span', {}, 'Conversas diretas'),
         el('button', { class: 'icon-btn sm', title: 'Nova conversa', onclick: (e) => this.dmPicker(e.clientX, e.clientY) }, icon('plus', 14))),
       ...(dms.length
@@ -173,7 +174,8 @@ export class Home {
       el('div', { class: 'hero-actions' },
         el('button', { class: 'btn btn-primary', onclick: () => { this.tab = 'add'; this.render(); } }, icon('plus', 16), 'Adicionar amigo'),
         el('button', { class: 'btn btn-ghost', onclick: () => this.newGroupDialog('create') }, '✨ Criar grupo'),
-        el('button', { class: 'btn btn-ghost', onclick: () => this.newGroupDialog('join') }, '🔗 Entrar com convite')),
+        el('button', { class: 'btn btn-ghost', onclick: () => this.newGroupDialog('join') }, '🔗 Entrar com convite'),
+        el('a', { class: 'btn btn-ghost', href: '/coop', target: '_blank', rel: 'noopener', title: 'App do Modo Coop: amigos jogando no seu PC' }, icon('download', 16), 'Baixar app (Coop)')),
       me.email ? null : el('div', { class: 'email-nudge' }, '📧 Sua conta ainda não tem e-mail.',
         el('button', { class: 'btn btn-ghost btn-sm', onclick: () => this.app.openSettings('account') }, 'Adicionar e-mail'))
     );

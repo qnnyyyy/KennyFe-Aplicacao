@@ -1,9 +1,13 @@
 // Saída de áudio da call: volume por pessoa (0–200%), volume por transmissão,
 // silenciar localmente, ensurdecer, escolher o alto-falante e detectar quem fala.
+// Modo anti-eco (padrão no celular): a voz toca direto num <audio>, porque o cancelamento
+// de eco do celular não "enxerga" o som que passa pelo Web Audio e a outra pessoa ouve eco.
 import { store, save } from '../ui.js';
 
 export class AudioOut {
-  constructor({ onSpeaking }) {
+  constructor({ onSpeaking, elementMode = false }) {
+    this.elementMode = elementMode;
+    this.sinkId = '';
     this.ctx = new AudioContext({ latencyHint: 'interactive', sampleRate: 48000 });
     this.master = this.ctx.createGain();
     this.master.connect(this.ctx.destination);
@@ -24,7 +28,9 @@ export class AudioOut {
 
   async setOutputDevice(deviceId) {
     try {
-      if (this.ctx.setSinkId) await this.ctx.setSinkId(deviceId === 'default' ? '' : deviceId);
+      this.sinkId = deviceId === 'default' ? '' : deviceId;
+      if (this.elementMode) for (const e of this.tracks.values()) await e.el.setSinkId?.(this.sinkId).catch(() => {});
+      else if (this.ctx.setSinkId) await this.ctx.setSinkId(this.sinkId);
     } catch (err) {
       console.warn('setSinkId', err);
     }
@@ -36,16 +42,22 @@ export class AudioOut {
     const ms = new MediaStream([track]);
     // Chrome só "puxa" áudio WebRTC para o Web Audio se houver um <audio> ligado a ele
     const elx = new Audio();
-    elx.muted = true;
+    elx.autoplay = true;
+    elx.playsInline = true;
+    elx.muted = !this.elementMode || this.deafened;
     elx.srcObject = ms;
+    if (this.elementMode && this.sinkId) elx.setSinkId?.(this.sinkId).catch(() => {});
     elx.play().catch(() => {});
     const src = this.ctx.createMediaStreamSource(ms);
     const gain = this.ctx.createGain();
     const analyser = this.ctx.createAnalyser();
     analyser.fftSize = 1024;
     src.connect(analyser);
-    src.connect(gain);
-    gain.connect(this.master);
+    // no modo anti-eco o Web Audio só "escuta" para saber quem está falando
+    if (!this.elementMode) {
+      src.connect(gain);
+      gain.connect(this.master);
+    }
     const entry = { peerId, userId, track, stream, kind, screenId, el: elx, src, gain, analyser, lastLoud: 0 };
     this.tracks.set(track.id, entry);
     this.applyGain(entry);
@@ -82,6 +94,11 @@ export class AudioOut {
     if (this.userMute[e.userId]) v = 0;
     else if (e.kind === 'screen') v = this.streamVol.get(e.screenId) ?? 1;
     else v = this.userVol[e.userId] ?? 1;
+    if (this.elementMode) {
+      e.el.volume = Math.max(0, Math.min(1, v)); // <audio> vai até 100%
+      e.el.muted = this.deafened || v === 0;
+      return;
+    }
     e.gain.gain.setTargetAtTime(v, this.ctx.currentTime, 0.03);
   }
 
@@ -119,6 +136,7 @@ export class AudioOut {
 
   setDeafened(d) {
     this.deafened = d;
+    if (this.elementMode) this.applyAll();
     this.master.gain.setTargetAtTime(d ? 0 : 1, this.ctx.currentTime, 0.02);
   }
 

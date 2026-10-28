@@ -109,7 +109,7 @@ export class CallController {
     this.active = true;
     this.remotes.clear();
 
-    this.audioOut = new AudioOut({ onSpeaking: (peerId, sp) => this.onSpeaking(peerId, sp) });
+    this.audioOut = new AudioOut({ onSpeaking: (peerId, sp) => this.onSpeaking(peerId, sp), elementMode: settings().antiEcho ?? IS_MOBILE });
     this.audioOut.resume();
     this.audioOut.setOutputDevice(settings().outputDeviceId);
     this.audioOut.setDeafened(this.deafened);

@@ -1361,3 +1361,5 @@ kbd { min-width: 170px; padding: 5px 10px; border-radius: 8px; background: rgba(
 .chat-title b { flex: 0 1 auto; }
 .room.with-stage .chat-topic { display: none; }
 #msg-input::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+a.side-nav { text-decoration: none; } .side-nav > span.pc-only-pill { flex: none; margin-left: 0; }
+a.btn { text-decoration: none; color: inherit; }

@@ -1,5 +1,5 @@
 // Tela de configurações: conta, voz e vídeo, transmissão.
-import { el, icon, modal, toast, avatar, FRAMES } from './ui.js';
+import { el, icon, modal, toast, avatar, FRAMES, IS_MOBILE } from './ui.js';
 import { POPULAR_GAMES, gameEmoji } from './gamesdata.js';
 import { profileCard } from './profile.js';
 import { api } from './api.js';
@@ -267,6 +267,7 @@ function voicePane(app) {
       el('label', { class: 'prop' }, el('div', { class: 'prop-head' }, el('span', {}, 'Volume do microfone'), volOut), vol),
       el('h4', {}, 'Processamento de voz'),
       sw('Cancelamento de eco', 'Evita que o som da call volte pelo seu microfone.', st.echoCancellation, (v) => update({ echoCancellation: v })),
+      sw('Modo anti-eco na saída', 'Toca as vozes pelo caminho normal do navegador, para o cancelamento de eco funcionar mesmo sem fone (já vem ligado no celular). Com ele, o volume por pessoa vai até 100%. Vale na próxima call.', st.antiEcho ?? IS_MOBILE, (v) => update({ antiEcho: v })),
       sw('Supressão de ruído', 'Tira ventilador, teclado e barulhos de fundo.', st.noiseSuppression, (v) => update({ noiseSuppression: v })),
       sw('Ganho automático', 'Ajusta o volume da sua voz sozinho.', st.autoGainControl, (v) => update({ autoGainControl: v })),
       sw('Modo alta fidelidade (estúdio)', 'Desliga todo o processamento e envia áudio estéreo puro a 510 kbps. Ideal para música/instrumento. Use fone!', st.hifi, (v) => update({ hifi: v })),
