@@ -4,10 +4,13 @@ import { api } from './api.js';
 import { emojiPicker, onlyEmoji } from './emoji.js';
 import { openStudio } from './creator.js';
 import { openProfile } from './profile.js';
+import { nameColor, can } from './guild.js';
 
 const QUICK_REACTIONS = ['❤️', '😂', '😍', '🥺', '🔥', '👍'];
 
-function renderText(text) {
+export const fmtDur = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+
+export function renderText(text) {
   let h = escapeHtml(text);
   h = h.replace(/```([\s\S]+?)```/g, '<pre>$1</pre>');
   h = h.replace(/`([^`\n]+)`/g, '<code>$1</code>');
@@ -24,6 +27,7 @@ export class Chat {
     this.app = app;
     this.socket = app.socket;
     this.groupId = null;
+    this.channelId = null;
     this.messages = new Map(); // id -> msg
     this.list = $('#messages');
     this.input = $('#msg-input');
@@ -43,34 +47,40 @@ export class Chat {
     const s = this.socket;
     s.on('chat:message', (m) => this.onMessage(m));
     s.on('chat:update', (m) => {
-      if (m.groupId !== this.groupId) return;
+      if (m.channelId !== this.channelId) return;
       this.messages.set(m.id, m);
       const node = this.list.querySelector(`[data-mid="${m.id}"]`);
       if (node) node.replaceWith(this.renderMessage(m, node.classList.contains('cont')));
     });
-    s.on('chat:delete', ({ id, groupId }) => {
-      if (groupId !== this.groupId) return;
+    s.on('chat:delete', ({ id, channelId }) => {
+      if (channelId !== this.channelId) return;
       this.messages.delete(id);
       this.list.querySelector(`[data-mid="${id}"]`)?.remove();
     });
-    s.on('chat:typing', ({ groupId, userId }) => {
-      if (groupId !== this.groupId) return;
+    s.on('chat:typing', ({ channelId, userId }) => {
+      if (channelId !== this.channelId) return;
       clearTimeout(this.typingUsers.get(userId));
       this.typingUsers.set(userId, setTimeout(() => { this.typingUsers.delete(userId); this.renderTyping(); }, 4000));
       this.renderTyping();
     });
   }
 
-  async open(groupId) {
+  channel() {
+    return this.app.channel(this.channelId);
+  }
+
+  async open(groupId, channelId) {
     this.groupId = groupId;
+    this.channelId = channelId;
     this.messages.clear();
+    this.updateComposer();
     this.list.replaceChildren(el('div', { class: 'loading' }, 'Carregando…'));
     this.cancelReply();
     this.typingUsers.clear();
     this.renderTyping();
     try {
-      const { messages, hasMore } = await api.get(`/groups/${groupId}/messages`);
-      if (this.groupId !== groupId) return;
+      const { messages, hasMore } = await api.get(`/groups/${groupId}/messages?channel=${channelId}`);
+      if (this.groupId !== groupId || this.channelId !== channelId) return;
       this.hasMore = hasMore;
       this.list.replaceChildren();
       if (!messages.length) this.list.append(this.emptyState());
@@ -84,7 +94,22 @@ export class Chat {
 
   emptyState() {
     const g = this.app.group(this.groupId);
-    return el('div', { class: 'chat-empty' }, el('div', { class: 'chat-empty-ic' }, g?.isDm ? '👋' : g?.icon || '💬'), el('h3', {}, g?.isDm ? `Começo da sua conversa com ${this.app.groupTitle(g)}` : `Começo de ${g?.name || 'conversa'}`), el('p', {}, 'Mande um oi, uma figurinha ou crie um GIF ✨'));
+    const ch = this.channel();
+    if (g?.isDm) return el('div', { class: 'chat-empty' }, el('div', { class: 'chat-empty-ic' }, '👋'), el('h3', {}, `Começo da sua conversa com ${this.app.groupTitle(g)}`), el('p', {}, 'Mande um oi, uma figurinha ou crie um GIF ✨'));
+    return el('div', { class: 'chat-empty' },
+      el('div', { class: 'chat-empty-ic' }, ch?.emoji || (ch?.kind === 'voice' ? '🔊' : '#')),
+      el('h3', {}, ch?.kind === 'voice' ? `Chat de ${ch.name}` : `Bem-vindo(a) a #${ch?.name || 'conversa'}!`),
+      el('p', {}, ch?.topic || (ch?.kind === 'voice' ? 'Quem estiver na call conversa por aqui também. Use /botmusic para chamar o KenBeat 🎧' : 'Mande um oi, uma figurinha, crie um GIF ✨ ou digite / para ver os comandos.')));
+  }
+
+  // canal só leitura para quem não tem acesso
+  updateComposer() {
+    const ch = this.channel();
+    const g = this.app.group(this.groupId);
+    const readOnly = Boolean(ch && ch.kind === 'text' && !ch.canEnter);
+    $('#composer').classList.toggle('readonly', readOnly);
+    this.input.disabled = readOnly;
+    this.input.placeholder = readOnly ? '🔒 Canal só leitura para a sua classe' : g?.isDm ? `Mensagem para ${this.app.groupTitle(g)}` : ch ? `Mensagem em ${ch.kind === 'voice' ? '🔊 ' : '#'}${ch.name.length > 16 ? ch.name.slice(0, 15) + '…' : ch.name}` : 'Mensagem...';
   }
 
   async loadOlder() {
@@ -93,7 +118,7 @@ export class Chat {
     this.loadingOlder = true;
     const prevHeight = this.list.scrollHeight;
     try {
-      const { messages, hasMore } = await api.get(`/groups/${this.groupId}/messages?before=${first}`);
+      const { messages, hasMore } = await api.get(`/groups/${this.groupId}/messages?channel=${this.channelId}&before=${first}`);
       this.hasMore = hasMore;
       const frag = document.createDocumentFragment();
       let prev = null;
@@ -110,7 +135,8 @@ export class Chat {
   }
 
   isContinuation(prev, m) {
-    return prev && prev.author?.id === m.author?.id && m.type !== 'system' && prev.type !== 'system' && m.createdAt - prev.createdAt < 300 && !m.reply;
+    const solo = (x) => ['system', 'bot', 'poll', 'local'].includes(x.type);
+    return prev && prev.author?.id === m.author?.id && !solo(m) && !solo(prev) && m.createdAt - prev.createdAt < 300 && !m.reply;
   }
 
   appendMany(msgs) {
@@ -124,13 +150,15 @@ export class Chat {
 
   onMessage(m) {
     const mine = m.author?.id === this.app.me.id;
-    if (m.groupId !== this.groupId || document.hidden) {
+    const here = m.channelId === this.channelId;
+    if (!here || document.hidden) {
       this.app.onUnread(m);
-      if (!mine && m.type !== 'system') {
+      const mentioned = m.type === 'bot' && this.botData(m)?.mention === this.app.me.id;
+      if ((!mine && m.type !== 'system' && m.type !== 'bot') || mentioned) {
         sfx('message');
         this.app.notify(m);
       }
-      if (m.groupId !== this.groupId) return;
+      if (!here) return;
     }
     if (this.messages.has(m.id)) return;
     this.list.querySelector('.chat-empty')?.remove();
@@ -167,10 +195,81 @@ export class Chat {
     return null;
   }
 
+  botData(m) {
+    if (m._bot !== undefined) return m._bot;
+    try {
+      m._bot = JSON.parse(m.content);
+    } catch {
+      m._bot = null;
+    }
+    return m._bot;
+  }
+
+  // resposta de comando que só você vê (não fica salva)
+  local(text, { title = 'Kenfeh', icon: ic = '✨' } = {}) {
+    const id = 'l' + Date.now() + Math.random();
+    const node = el('div', { class: 'msg bot local', dataset: { mid: id } },
+      el('div', { class: 'bot-av' }, ic),
+      el('div', { class: 'msg-main' },
+        el('div', { class: 'msg-head' }, el('b', { class: 'bot-name' }, title), el('span', { class: 'bot-tag' }, 'BOT'), el('small', { class: 'only-you' }, '👁️ só você vê')),
+        el('div', { class: 'msg-text', html: renderText(text) })),
+      el('button', { class: 'icon-btn sm local-x', title: 'Dispensar', onclick: () => node.remove() }, icon('x', 14)));
+    this.list.querySelector('.chat-empty')?.remove();
+    this.list.append(node);
+    this.scrollBottom();
+  }
+
+  renderBot(m) {
+    const d = this.botData(m) || { text: m.content };
+    const music = d.bot === 'music';
+    if (d.bot === 'me') {
+      return el('div', { class: 'msg action', dataset: { mid: m.id } }, el('span', { class: 'sys-ic' }, '✦'), el('i', {}, el('b', { style: { color: nameColor(this.app, this.app.group(m.groupId), m.author) } }, m.author?.displayName || ''), ' ', d.text), el('time', {}, formatTime(m.createdAt)));
+    }
+    const body = el('div', { class: 'msg-body' });
+    if (d.text) body.append(el('div', { class: 'msg-text', html: renderText((d.mention ? `@${this.app.userName(d.mention)} ` : '') + d.text) }));
+    if (d.track) {
+      const t = d.track;
+      body.append(el('a', { class: `track-card ${d.kind || ''}`, href: `https://www.youtube.com/watch?v=${t.videoId}`, target: '_blank', rel: 'noopener noreferrer' },
+        el('img', { src: t.thumb, loading: 'lazy', alt: '' }),
+        el('div', { class: 'track-info' }, el('b', {}, t.title), el('small', {}, [t.author, t.duration ? fmtDur(t.duration) : null, t.by ? `pedida por ${t.by.name}` : null].filter(Boolean).join(' • ')), d.extra ? el('small', { class: 'muted' }, d.extra) : null)));
+    }
+    const node = el('div', { class: `msg bot ${music ? 'music' : ''}`, dataset: { mid: m.id } },
+      el('div', { class: 'bot-av' }, music ? '🎧' : '✨'),
+      el('div', { class: 'msg-main' },
+        el('div', { class: 'msg-head' }, el('b', { class: 'bot-name' }, music ? 'KenBeat' : 'Kenfeh'), el('span', { class: 'bot-tag' }, 'BOT'), el('small', { class: 'bot-by' }, `usado por ${m.author?.displayName || '?'}`), el('time', {}, formatTime(m.createdAt))),
+        body));
+    onContext(node, (x, y) => this.messageMenu(m, x, y));
+    return node;
+  }
+
+  renderPoll(m) {
+    const d = this.botData(m) || { q: '?', options: [] };
+    const votes = d.options.map((_, i) => (m.reactions || []).filter((r) => r.emoji === `opt:${i}`));
+    const total = votes.reduce((a, v) => a + v.length, 0);
+    const mine = votes.findIndex((v) => v.some((r) => r.userId === this.app.me.id));
+    const node = el('div', { class: 'msg poll', dataset: { mid: m.id } },
+      avatar(m.author, 40),
+      el('div', { class: 'msg-main' },
+        el('div', { class: 'msg-head' }, el('b', { style: { color: nameColor(this.app, this.app.group(m.groupId), m.author) } }, m.author?.displayName || '?'), el('time', {}, formatTime(m.createdAt))),
+        el('div', { class: 'poll-card' },
+          el('div', { class: 'poll-q' }, '📊 ', d.q),
+          ...d.options.map((o, i) => {
+            const n = votes[i].length;
+            const pct = total ? Math.round((n / total) * 100) : 0;
+            return el('button', { class: `poll-opt ${mine === i ? 'mine' : ''}`, title: votes[i].map((r) => this.app.userName(r.userId)).join(', ') || 'ninguém ainda', onclick: () => this.react(m.id, `opt:${i}`) },
+              el('i', { style: { width: pct + '%' } }), el('span', {}, o), el('b', {}, `${pct}% • ${n}`));
+          }),
+          el('small', { class: 'muted' }, `${total} voto(s) • clique para votar (um voto por pessoa, clique de novo para tirar)`))));
+    onContext(node, (x, y) => this.messageMenu(m, x, y));
+    return node;
+  }
+
   renderMessage(m, cont = false) {
     if (m.type === 'system') {
       return el('div', { class: 'msg system', dataset: { mid: m.id } }, el('span', { class: 'sys-ic' }, '✦'), el('b', {}, m.author?.displayName || ''), ' ', m.content, el('time', {}, formatTime(m.createdAt)));
     }
+    if (m.type === 'bot') return this.renderBot(m);
+    if (m.type === 'poll') return this.renderPoll(m);
     const mine = m.author?.id === this.app.me.id;
     const body = el('div', { class: 'msg-body' });
     if (m.reply) {
@@ -201,7 +300,7 @@ export class Chat {
       'div',
       { class: `msg ${cont ? 'cont' : ''} ${mine ? 'mine' : ''}`, dataset: { mid: m.id } },
       cont ? el('div', { class: 'msg-gutter' }, el('time', {}, new Date(m.createdAt * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))) : avatar(m.author, 40),
-      el('div', { class: 'msg-main' }, cont ? null : el('div', { class: 'msg-head' }, el('b', { style: { color: m.author?.color } }, m.author?.displayName || '?'), el('time', {}, formatTime(m.createdAt))), body),
+      el('div', { class: 'msg-main' }, cont ? null : el('div', { class: 'msg-head' }, el('b', { style: { color: nameColor(this.app, this.app.group(m.groupId), m.author) } }, m.author?.displayName || '?'), el('time', {}, formatTime(m.createdAt))), body),
       tools
     );
     onContext(node, (x, y) => this.messageMenu(m, x, y));
@@ -231,7 +330,8 @@ export class Chat {
       items.push({ label: 'Baixar', icon: 'download', onClick: () => { const a = el('a', { href: m.mediaUrl, download: '' }); a.click(); } });
     }
     if (mine && m.type === 'text') items.push({ label: 'Editar', icon: 'edit', onClick: () => this.startEdit(m) });
-    if (mine) items.push({ type: 'sep' }, { label: 'Apagar mensagem', icon: 'trash', danger: true, onClick: () => this.socket.emit('chat:delete', { messageId: m.id }) });
+    if (mine || can(this.app, this.app.group(m.groupId), 'manage_messages'))
+      items.push({ type: 'sep' }, { label: mine ? 'Apagar mensagem' : 'Apagar mensagem (moderação)', icon: 'trash', danger: true, onClick: () => this.socket.emit('chat:delete', { messageId: m.id }) });
     contextMenu(x, y, items);
   }
 
@@ -273,7 +373,7 @@ export class Chat {
 
   async send(payload) {
     if (!this.groupId) return;
-    const res = await this.socket.emitWithAck('chat:send', { groupId: this.groupId, replyTo: this.replyTo?.id, ...payload });
+    const res = await this.socket.emitWithAck('chat:send', { groupId: this.groupId, channelId: this.channelId, replyTo: this.replyTo?.id, ...payload });
     if (res?.error) toast(res.error, 'error');
     this.cancelReply();
   }
@@ -289,6 +389,7 @@ export class Chat {
     }
     this.input.value = '';
     this.autosize();
+    if (text.startsWith('/') && this.app.commands?.run(text)) return;
     this.send({ type: 'text', content: text });
   }
 
@@ -323,10 +424,11 @@ export class Chat {
       this.autosize();
       if (Date.now() - this.lastTypingSent > 2500 && input.value.trim()) {
         this.lastTypingSent = Date.now();
-        this.socket.emit('chat:typing', { groupId: this.groupId });
+        if (!input.value.startsWith('/')) this.socket.emit('chat:typing', { groupId: this.groupId, channelId: this.channelId });
       }
     });
     input.addEventListener('keydown', (e) => {
+      if (this.app.commands?.onKey(e)) return;
       if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
         e.preventDefault();
         this.sendText();

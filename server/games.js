@@ -361,22 +361,25 @@ function attachGames(io, hub) {
 
   const userName = (id) => db.prepare('SELECT display_name FROM users WHERE id = ?').get(id)?.display_name || '?';
 
+  // também usado pelo comando /jogar
+  function createGame(userId, groupId, type) {
+    if (!isMember(groupId, userId) || !GAMES[type]) return { error: 'Jogo inválido.' };
+    if (!require('./guild').can(groupId, userId, 'start_games')) return { error: 'Sua classe não pode abrir jogos.' };
+    endSession(groupId);
+    const s = { groupId, type, hostId: userId, players: [userId], names: [userName(userId)], scores: [0], state: GAMES[type].init(), timer: null };
+    sessions.set(groupId, s);
+    stats.track(userId, 'game_' + type);
+    hub.broadcastMessage(require('./routes').createMessage({ groupId, userId, type: 'system', content: `abriu uma partida de ${GAMES[type].name} 🎮 — vem jogar!` }));
+    hub.emitGame(s);
+    return { ok: true };
+  }
+
   io.on('connection', (socket) => {
     const userId = socket.data.userId;
     // estado atual dos jogos dos grupos
     for (const s of sessions.values()) if (isMember(s.groupId, userId)) socket.emit('game:state', publicSession(s, userId));
 
-    socket.on('game:create', ({ groupId, type } = {}, ack) => {
-      groupId = Number(groupId);
-      if (!isMember(groupId, userId) || !GAMES[type]) return ack?.({ error: 'Jogo inválido.' });
-      endSession(groupId);
-      const s = { groupId, type, hostId: userId, players: [userId], names: [userName(userId)], scores: [0], state: GAMES[type].init(), timer: null };
-      sessions.set(groupId, s);
-      stats.track(userId, 'game_' + type);
-      hub.broadcastMessage(require('./routes').createMessage({ groupId, userId, type: 'system', content: `abriu uma partida de ${GAMES[type].name} 🎮 — vem jogar!` }));
-      hub.emitGame(s);
-      ack?.({ ok: true });
-    });
+    socket.on('game:create', ({ groupId, type } = {}, ack) => ack?.(createGame(userId, Number(groupId), type)));
 
     socket.on('game:join', ({ groupId } = {}, ack) => {
       const s = sessions.get(Number(groupId));
@@ -487,6 +490,7 @@ function attachGames(io, hub) {
       socket.to(`group:${s.groupId}`).emit('game:stroke', { groupId: s.groupId, stroke: clean });
     });
   });
+  return { createGame };
 }
 
 module.exports = { attachGames, GAMES };

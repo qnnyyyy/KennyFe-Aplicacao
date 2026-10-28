@@ -23,6 +23,7 @@ export const api = {
   get: (url) => request('GET', url),
   post: (url, body) => request('POST', url, body ?? {}),
   patch: (url, body) => request('PATCH', url, body ?? {}),
+  put: (url, body) => request('PUT', url, body ?? {}),
   del: (url) => request('DELETE', url),
   upload(file, purpose = 'file', name = '', onProgress) {
     // XHR para ter barra de progresso

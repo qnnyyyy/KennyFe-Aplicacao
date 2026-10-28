@@ -87,8 +87,9 @@ export class Stage {
     const coopBtn = el('button', { class: 'tile-coop hidden', onclick: (e) => { e.stopPropagation(); this.onCoop?.(t); } });
     const coopHint = el('div', { class: 'tile-coop-hint hidden' }, '🎮 Você está jogando — clique no vídeo para controlar • Esc solta o mouse • Ctrl+Shift+Q sai');
     const rec = el('div', { class: 'tile-rec' }, '● REC');
-    const tileEl = el('div', { class: 'tile', dataset: { key } }, video, avatarWrap, label, stats, actions, coopBtn, coopHint, rec, handle);
-    const t = { key, el: tileEl, video, avatarWrap, nameEl, badge, muteIc, label, stats, actions, handle, coopBtn, coopHint, info: { ...info } };
+    const custom = el('div', { class: 'tile-custom' }); // conteúdo próprio (ex.: bloco do bot de música)
+    const tileEl = el('div', { class: 'tile', dataset: { key } }, video, avatarWrap, custom, label, stats, actions, coopBtn, coopHint, rec, handle);
+    const t = { key, el: tileEl, video, avatarWrap, custom, nameEl, badge, muteIc, label, stats, actions, handle, coopBtn, coopHint, info: { ...info } };
 
     const btn = (ic, title, fn) => el('button', { class: 'tile-btn', title, onclick: (e) => { e.stopPropagation(); fn(); } }, icon(ic, 16));
     actions.append(
@@ -136,8 +137,11 @@ export class Stage {
 
   updateTile(t) {
     const { info } = t;
-    const hasVideo = info.kind !== 'avatar' && info.stream;
-    t.el.classList.toggle('is-avatar', !hasVideo);
+    const isCustom = info.kind === 'custom';
+    const hasVideo = info.kind !== 'avatar' && !isCustom && info.stream;
+    t.el.classList.toggle('is-custom', isCustom);
+    t.el.classList.toggle('is-avatar', !hasVideo && !isCustom);
+    if (isCustom) info.render?.(t.custom);
     t.el.classList.toggle('is-screen', info.kind === 'screen');
     t.el.classList.toggle('is-local', Boolean(info.isLocal));
     t.el.classList.toggle('mirror', Boolean(info.mirror));

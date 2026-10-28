@@ -60,7 +60,7 @@ export class Home {
       const { group } = await api.post(`/dm/${userId}`);
       this.app.groups.set(group.id, group);
       this.selectGroup(group.id);
-      if (call) this.app.call.join(group.id).catch((e) => toast(e.message, 'error'));
+      if (call) this.app.joinVoice(this.app.defaultVoice(group)?.id);
     } catch (err) {
       toast(err.message, 'error');
     }
@@ -87,7 +87,7 @@ export class Home {
             const u = this.dmOther(g);
             const on = app.online.has(u.id);
             const unread = (g.lastMessageId || 0) > (app.lastRead[g.id] || 0) && g.id !== app.currentGroupId;
-            const inCall = (app.calls.get(g.id) || []).length > 0;
+            const inCall = app.groupCallParts(g.id).length > 0;
             const row = el('button', { class: `dm-row ${g.id === app.currentGroupId ? 'active' : ''} ${unread ? 'unread' : ''} ${on ? 'online' : 'offline'}`, onclick: () => this.selectGroup(g.id) },
               el('div', { class: 'member-av' }, avatar(u, 32), el('span', { class: 'presence' })),
               el('div', { class: 'member-info' }, el('b', {}, u.displayName), el('small', { class: activityLine(u, on) ? 'member-act' : '' }, activityLine(u, on) || u.statusText || (on ? 'online' : 'offline'))),
@@ -253,19 +253,23 @@ export class Home {
   // painel da direita: calls ativas, quem está jogando, seus grupos
   nowPanel() {
     const app = this.app;
-    const calls = [...app.calls.entries()].filter(([gid, parts]) => parts.length && app.groups.has(gid));
+    const calls = [...app.calls.entries()].filter(([cid, parts]) => parts.length && app.channel(cid));
     const playing = this.friends.filter((f) => f.status === 'accepted' && f.user.activity && app.online.has(f.user.id));
     const groups = [...app.groups.values()].filter((g) => !g.isDm);
     return el('aside', { class: 'home-now' },
       el('h4', {}, '🔴 Rolando agora'),
       calls.length
-        ? calls.map(([gid, parts]) => {
-            const g = app.groups.get(gid);
+        ? calls.map(([cid, parts]) => {
+            const ch = app.channel(cid);
+            const g = app.groups.get(ch.groupId);
             const names = parts.map((p) => app.userName(p.userId));
+            const music = app.music?.stateOf(cid)?.current;
             return el('div', { class: 'now-card call' },
               el('div', { class: 'now-top' }, el('b', {}, app.groupTitle(g)), el('span', { class: 'live-pill' }, `${parts.length} na call`)),
+              g.isDm ? null : el('small', {}, `${ch.emoji || '🔊'} ${ch.name}`),
               el('small', { class: 'muted' }, names.slice(0, 4).join(', ') + (names.length > 4 ? '…' : '')),
-              el('button', { class: 'btn btn-call btn-sm', onclick: () => { this.selectGroup(gid); app.call.join(gid); } }, icon('phone', 14), 'Entrar'));
+              music ? el('small', { class: 'now-music' }, '🎧 ', music.title) : null,
+              el('button', { class: 'btn btn-call btn-sm', onclick: () => app.joinVoice(cid) }, icon('phone', 14), 'Entrar'));
           })
         : el('p', { class: 'muted small' }, 'Nenhuma call agora.'),
       el('h4', {}, '🎮 Jogando agora'),

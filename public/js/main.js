@@ -9,6 +9,9 @@ import { popover, closeMenu } from './ui.js';
 import { openProfile, activityLine } from './profile.js';
 import { GamesHub } from './games.js';
 import { Home } from './home.js';
+import { renderChannels, renderMembers as renderMemberList, memberModItems, groupSettings, channelDialog, can } from './guild.js';
+import { Commands } from './commands.js';
+import { MusicClient } from './music.js';
 
 const GROUP_ICONS = ['🎮', '🍿', '🎬', '🎧', '🔥', '⚡', '🌙', '👾', '🏆', '🐱', '✨', '🍕'];
 
@@ -17,8 +20,12 @@ const app = {
   socket: null,
   groups: new Map(),
   currentGroupId: null, // null = Início
+  currentChannelId: null, // canal aberto no grupo atual
+  channelPrefs: store('current-channel', {}), // último canal aberto em cada grupo
   online: new Set(),
-  calls: new Map(), // groupId -> participants
+  calls: new Map(), // id do canal de voz -> participantes
+  callGroups: new Map(), // id do canal de voz -> grupo
+  groupsListeners: new Set(),
   lastRead: store('last-read', {}),
   chatHidden: store('chat-hidden', false),
 
@@ -35,6 +42,31 @@ const app = {
   },
   group(id) {
     return this.groups.get(id);
+  },
+  channel(id) {
+    for (const g of this.groups.values()) {
+      const c = g.channels?.find((x) => x.id === id);
+      if (c) return c;
+    }
+    return null;
+  },
+  callGroupOf(channelId) {
+    return this.callGroups.get(channelId) ?? this.channel(channelId)?.groupId ?? null;
+  },
+  // todo mundo em call num grupo (somando os canais de voz)
+  groupCallParts(groupId) {
+    const out = [];
+    for (const [cid, parts] of this.calls) if (this.callGroupOf(cid) === groupId) out.push(...parts);
+    return out;
+  },
+  defaultVoice(g) {
+    return g?.channels?.find((c) => c.kind === 'voice') || null;
+  },
+  onGroupsUpdate(fn) {
+    this.groupsListeners.add(fn);
+  },
+  offGroupsUpdate(fn) {
+    this.groupsListeners.delete(fn);
   },
   // nome para mostrar: em conversa direta é o nome da outra pessoa
   groupTitle(g) {
@@ -104,7 +136,11 @@ function start(user) {
   app.chat = new Chat(app);
   app.call = new CallController(app);
   app.games = new GamesHub(app);
+  app.music = new MusicClient(app);
+  app.commands = new Commands(app);
   app.renderAll = () => renderAll();
+  app.joinVoice = (cid) => joinVoice(cid);
+  app.selectGroup = (id, cid) => selectGroup(id, cid);
 
   socket.on('connect_error', (err) => {
     if (err.message === 'unauthorized') location.reload();
@@ -114,9 +150,18 @@ function start(user) {
     const me = groups.flatMap((g) => g.members).find((m) => m.id === app.me.id);
     if (me) Object.assign(app.me, me);
     if (app.currentGroupId && !app.groups.has(app.currentGroupId)) app.currentGroupId = null;
+    // canal recém-criado por mim: já abre
+    if (app.pendingChannel && app.channel(app.pendingChannel)) {
+      const c = app.channel(app.pendingChannel);
+      app.pendingChannel = null;
+      return selectGroup(c.groupId, c.id);
+    }
+    const g = app.group(app.currentGroupId);
+    if (g && !g.channels.some((c) => c.id === app.currentChannelId)) return selectGroup(g.id);
     renderAll();
-    if (app.currentGroupId && app.chat.groupId !== app.currentGroupId) selectGroup(app.currentGroupId);
+    if (app.currentGroupId && (app.chat.groupId !== app.currentGroupId || app.chat.channelId !== app.currentChannelId)) selectGroup(app.currentGroupId, app.currentChannelId);
     if (app.call.active) app.call.refreshTiles();
+    app.groupsListeners.forEach((fn) => fn());
   });
   socket.on('user:update', ({ user }) => {
     for (const g of app.groups.values()) {
@@ -136,19 +181,22 @@ function start(user) {
     renderMembers();
     renderHome();
   });
-  socket.on('calls:update', ({ groupId, participants }) => {
-    app.calls.set(groupId, participants);
+  socket.on('calls:update', ({ groupId, channelId, participants }) => {
+    app.callGroups.set(channelId, groupId);
+    if (participants.length) app.calls.set(channelId, participants);
+    else app.calls.delete(channelId);
     renderHome();
     renderRail();
     renderVoiceUsers();
     renderRoomHeader();
   });
-  socket.on('call:ring', ({ groupId, userId }) => {
+  socket.on('call:ring', ({ groupId, channelId, userId }) => {
     if (app.call.active && app.call.groupId === groupId) return;
     const g = app.group(groupId);
+    const ch = app.channel(channelId);
     sfx('ring');
-    const text = g?.isDm ? `📞 ${app.userName(userId)} está te ligando!` : `📞 ${app.userName(userId)} começou uma call em ${g?.name || 'um grupo'}`;
-    toast(el('div', { class: 'ring-toast' }, el('span', {}, text), el('button', { class: 'btn btn-primary btn-sm', onclick: () => { selectGroup(groupId); app.call.join(groupId); } }, g?.isDm ? 'Atender' : 'Entrar')), 'info', 15000);
+    const text = g?.isDm ? `📞 ${app.userName(userId)} está te ligando!` : `📞 ${app.userName(userId)} entrou em ${ch?.emoji || '🔊'} ${ch?.name || 'call'} • ${g?.name || 'um grupo'}`;
+    toast(el('div', { class: 'ring-toast' }, el('span', {}, text), el('button', { class: 'btn btn-primary btn-sm', onclick: (e) => { e.currentTarget.closest('.toast')?.remove(); joinVoice(channelId); } }, g?.isDm ? 'Atender' : 'Entrar')), 'info', 15000);
     app.notify({ groupId, author: app.user(userId), type: 'text', content: '📞 começou uma call — vem!' });
   });
 
@@ -177,17 +225,25 @@ app.toggleChat = () => {
 app.markRead = (groupId) => {
   const g = app.group(groupId);
   if (!g) return;
-  const lastId = Math.max(g.lastMessageId || 0, ...[...app.chat.messages.keys()]);
-  app.lastRead[groupId] = lastId;
+  const lastId = Math.max(0, ...[...app.chat.messages.keys()]);
+  const ch = g.channels?.find((c) => c.id === app.chat.channelId);
+  if (ch) app.lastRead['c' + ch.id] = Math.max(ch.lastMessageId || 0, lastId);
+  // o grupo fica "lido" quando todos os canais que a pessoa vê estão lidos
+  const pending = (g.channels || []).some((c) => (c.lastMessageId || 0) > (app.lastRead['c' + c.id] || 0));
+  if (!pending || g.isDm) app.lastRead[groupId] = Math.max(g.lastMessageId || 0, lastId);
   save('last-read', app.lastRead);
   renderRail();
+  renderChannelList();
 };
 
 app.onUnread = (m) => {
   const g = app.group(m.groupId);
   if (g) g.lastMessageId = Math.max(g.lastMessageId || 0, m.id);
-  if (m.groupId === app.currentGroupId && !document.hidden) app.markRead(m.groupId);
+  const ch = g?.channels?.find((c) => c.id === m.channelId);
+  if (ch) ch.lastMessageId = Math.max(ch.lastMessageId || 0, m.id);
+  if (m.groupId === app.currentGroupId && m.channelId === app.chat.channelId && !document.hidden) app.markRead(m.groupId);
   renderRail();
+  renderChannelList();
 };
 
 app.notify = (m) => {
@@ -209,14 +265,61 @@ app.renderVoiceUsers = () => renderVoiceUsers();
 
 document.addEventListener('visibilitychange', () => !document.hidden && app.currentGroupId && app.markRead(app.currentGroupId));
 
-function selectGroup(id) {
+function selectGroup(id, channelId) {
+  const changedGroup = app.currentGroupId !== id;
   app.currentGroupId = id;
   save('current-group', id);
   $('#app').classList.remove('nav-open');
-  if (!id) app.chat.groupId = null;
+  const g = app.group(id);
+  if (g) {
+    const pick = (cid) => g.channels.find((c) => c.id === cid);
+    const ch = pick(channelId) || pick(app.channelPrefs[id]) || g.channels.find((c) => c.kind === 'text') || g.channels[0];
+    app.currentChannelId = ch?.id || null;
+    app.channelPrefs[id] = app.currentChannelId;
+    save('current-channel', app.channelPrefs);
+  } else {
+    app.currentChannelId = null;
+    app.chat.groupId = null;
+  }
   renderAll();
-  if (id) app.chat.open(id);
-  app.games?.onGroupChanged();
+  if (g && app.currentChannelId && (app.chat.groupId !== id || app.chat.channelId !== app.currentChannelId)) app.chat.open(id, app.currentChannelId);
+  if (changedGroup) app.games?.onGroupChanged();
+}
+
+// clicou num canal de voz: entra na call (como no Discord) e mostra o palco + o chat do próprio canal
+async function joinVoice(channelId) {
+  const ch = app.channel(channelId);
+  if (!ch) return;
+  if (!ch.canEnter) return lockedDialog(ch, 'locked');
+  const g = app.group(ch.groupId);
+  if (!g?.isDm) selectGroup(ch.groupId, ch.id);
+  else selectGroup(ch.groupId);
+  if (app.call.active && app.call.channelId === ch.id) return;
+  try {
+    const r = await app.call.join(ch.id);
+    if (r?.locked || r?.full) lockedDialog(ch, r.full ? 'full' : 'locked');
+  } catch (err) {
+    console.error(err);
+    toast('Não foi possível entrar na call: ' + err.message, 'error');
+    app.call.active && app.call.leave();
+  }
+}
+
+// call trancada ou lotada: dá para "bater na porta" e alguém de dentro libera
+function lockedDialog(ch, why) {
+  const parts = app.calls.get(ch.id) || [];
+  modal({
+    title: `${ch.emoji || '🔊'} ${ch.name} ${why === 'full' ? 'está lotada' : 'está trancada'}`,
+    content: el('div', {},
+      el('p', {}, why === 'full' ? `Essa call tem limite de ${ch.userLimit} pessoas.` : 'Só entra quem tem uma classe liberada para esse canal.'),
+      parts.length
+        ? el('div', {}, el('p', { class: 'muted small' }, `Na call agora: ${parts.map((p) => app.userName(p.userId)).join(', ')}`), el('p', { class: 'muted small' }, 'Você pode bater na porta: quem está lá dentro recebe um aviso e pode te deixar entrar.'))
+        : el('p', { class: 'muted small' }, 'Não tem ninguém lá dentro agora para abrir a porta.')),
+    actions: [
+      { label: 'Fechar', onClick: (c) => c() },
+      ...(parts.length ? [{ label: '🚪 Bater na porta', primary: true, onClick: (c) => app.socket.emit('call:knock', { channelId: ch.id }, (r) => { if (r?.error) toast(r.error, 'error'); else { toast('Toc toc! 🚪 Avisamos quem está na call.', 'success'); c(); } }) }] : []),
+    ],
+  });
 }
 
 // =====================================================================
@@ -226,6 +329,7 @@ function renderAll() {
   renderHome();
   renderRail();
   renderSidebar();
+  renderChannelList();
   renderMembers();
   renderVoiceUsers();
   renderMeBar();
@@ -249,7 +353,7 @@ function renderRail() {
   rail.replaceChildren(
     ...[...app.groups.values()].filter((g) => !g.isDm).map((g) => {
       const unread = (g.lastMessageId || 0) > (app.lastRead[g.id] || 0) && g.id !== app.currentGroupId;
-      const inCall = (app.calls.get(g.id) || []).length > 0;
+      const inCall = app.groupCallParts(g.id).length > 0;
       const b = el('button', { class: `rail-btn ${g.id === app.currentGroupId ? 'active' : ''} ${unread ? 'unread' : ''}`, title: g.name, onclick: () => selectGroup(g.id) },
         el('span', { class: 'rail-icon' }, g.icon),
         inCall ? el('span', { class: 'rail-call' }, icon('volume', 10)) : null
@@ -269,24 +373,20 @@ function renderSidebar() {
   $('#group-side').classList.toggle('hidden', homeMode);
 }
 
+function renderChannelList() {
+  renderChannels(app, $('#channel-list'), {
+    selectChannel: (cid) => {
+      const ch = app.channel(cid);
+      if (ch?.kind === 'voice') return joinVoice(cid);
+      selectGroup(app.currentGroupId, cid);
+    },
+    joinVoice,
+    userMenu,
+  });
+}
+
 function renderMembers() {
-  const g = app.group(app.currentGroupId);
-  const box = $('#members');
-  if (!g) return box.replaceChildren();
-  const sorted = [...g.members].sort((a, b) => Number(app.online.has(b.id)) - Number(app.online.has(a.id)));
-  box.replaceChildren(
-    ...sorted.map((m) => {
-      const on = app.online.has(m.id);
-      const row = el('div', { class: `member ${on ? 'online' : 'offline'}` },
-        el('div', { class: 'member-av' }, avatar(m, 32), el('span', { class: 'presence' })),
-        el('div', { class: 'member-info' }, el('b', { style: { color: m.color } }, m.displayName, m.role === 'owner' ? ' 👑' : ''),
-          activityLine(m, on) ? el('small', { class: 'member-act' }, activityLine(m, on)) : el('small', {}, m.statusText || (on ? 'online' : 'offline')))
-      );
-      row.addEventListener('click', (e) => openProfile(app, m, e.clientX, e.clientY));
-      onContext(row, (x, y) => userMenu(m, x, y));
-      return row;
-    })
-  );
+  renderMemberList(app, $('#members'), { userMenu });
 }
 
 function userMenu(m, x, y) {
@@ -297,50 +397,20 @@ function userMenu(m, x, y) {
   }
   items.push({ label: 'Copiar @usuário', icon: 'copy', onClick: () => navigator.clipboard.writeText(m.username) });
   if (m.id === app.me.id) items.push({ label: 'Editar perfil', icon: 'edit', onClick: () => app.openSettings('account') });
+  items.push(...memberModItems(app, app.group(app.currentGroupId), m));
   contextMenu(x, y, items);
 }
 
 function renderVoiceUsers() {
-  const g = app.group(app.currentGroupId);
-  const box = $('#voice-users');
-  if (!g) return box.replaceChildren();
-  const parts = app.calls.get(g.id) || [];
-  $('#call-count').textContent = parts.length ? parts.length : '';
-  box.replaceChildren(
-    ...parts.map((p) => {
-      const u = app.user(p.userId) || { displayName: 'Alguém', id: p.userId };
-      const streams = Object.values(p.state?.streams || {});
-      const live = streams.filter((s) => s.type === 'screen').length;
-      const cam = streams.some((s) => s.type === 'camera');
-      const row = el('div', { class: 'voice-user', dataset: { voiceUser: u.id } },
-        avatar(u, 24),
-        el('span', { class: 'vu-name' }, u.displayName),
-        el('span', { class: 'vu-icons' },
-          live ? el('span', { class: 'live-pill' }, live > 1 ? `AO VIVO ×${live}` : 'AO VIVO') : null,
-          cam ? icon('video', 14) : null,
-          pingBadge(p.peerId),
-          p.state?.deafened ? icon('headphones-off', 14) : p.state?.muted ? icon('mic-off', 14) : null
-        )
-      );
-      row.addEventListener('click', (e) => openProfile(app, u, e.clientX, e.clientY));
-      onContext(row, (x, y) => userMenu(u, x, y));
-      return row;
-    })
-  );
+  renderChannelList();
   // painel "na call" embaixo
   const inCall = app.call.active;
   $('#voice-panel').classList.toggle('hidden', !inCall);
   if (inCall) {
     const cg = app.group(app.call.groupId);
-    $('#vp-group').textContent = app.groupTitle(cg);
+    const ch = app.channel(app.call.channelId);
+    $('#vp-group').textContent = cg?.isDm ? app.groupTitle(cg) : `${ch?.emoji || '🔊'} ${ch?.name || ''} • ${cg?.name || ''}`;
   }
-  $('#channel-voice').classList.toggle('active', inCall && app.call.groupId === app.currentGroupId);
-}
-
-function pingBadge(peerId) {
-  const ms = app.call.active ? app.call.remotes.get(peerId)?.ping : null;
-  if (ms == null) return null;
-  return el('span', { class: `ping ${ms < 60 ? 'good' : ms < 140 ? 'ok' : 'bad'}`, title: 'Ping até você' }, `${ms} ms`);
 }
 
 function renderMeBar() {
@@ -353,15 +423,35 @@ function renderMeBar() {
   $('#me-deaf').classList.toggle('off', app.call.deafened);
 }
 
+// canal de voz ligado à tela atual: o próprio canal (se for de voz) ou a call da conversa direta
+function roomVoice() {
+  const g = app.group(app.currentGroupId);
+  const ch = app.channel(app.currentChannelId);
+  if (!g) return null;
+  if (g.isDm) return app.defaultVoice(g);
+  return ch?.kind === 'voice' ? ch : null;
+}
+
 function renderRoomHeader() {
   const g = app.group(app.currentGroupId);
   if (!g) return;
-  $('#chat-icon').textContent = g.isDm ? '@' : g.icon;
-  $('#chat-name').textContent = g.isDm ? app.groupTitle(g) : g.name;
+  const ch = app.channel(app.currentChannelId);
+  if (g.isDm) {
+    $('#chat-icon').textContent = '@';
+    $('#chat-name').textContent = app.groupTitle(g);
+    $('#chat-topic').textContent = '';
+  } else {
+    $('#chat-icon').replaceChildren(ch?.emoji || (ch?.kind === 'voice' ? icon('volume', 18) : icon('hash', 18)));
+    $('#chat-name').textContent = ch?.name || g.name;
+    $('#chat-topic').textContent = ch?.topic || (ch?.kind === 'voice' ? 'chat do canal de voz' : '');
+  }
   const btn = $('#btn-join-call');
-  const here = app.call.active && app.call.groupId === g.id;
-  const count = (app.calls.get(g.id) || []).length;
-  btn.replaceChildren(icon(here ? 'phone-off' : 'phone', 16), el('span', {}, here ? 'Sair da call' : count ? `Entrar na call (${count})` : 'Iniciar call'));
+  const voice = roomVoice();
+  btn.classList.toggle('hidden', !voice);
+  if (!voice) return;
+  const here = app.call.active && app.call.channelId === voice.id;
+  const count = (app.calls.get(voice.id) || []).length;
+  btn.replaceChildren(icon(here ? 'phone-off' : 'phone', 16), el('span', {}, here ? 'Sair da call' : count ? `Entrar na call (${count})` : g.isDm ? 'Ligar' : 'Entrar na call'));
   btn.classList.toggle('danger', here);
   btn.classList.toggle('pulse', !here && count > 0);
 }
@@ -370,7 +460,8 @@ function renderRoomLayout() {
   const g = app.group(app.currentGroupId);
   $('#home').classList.toggle('hidden', Boolean(g));
   $('#room').classList.toggle('hidden', !g);
-  const showStage = app.call.active && app.call.groupId === app.currentGroupId;
+  const voice = roomVoice();
+  const showStage = Boolean(app.call.active && voice && app.call.channelId === voice.id);
   $('#stage-wrap').classList.toggle('hidden', !showStage);
   $('#room').classList.toggle('with-stage', showStage);
   const chatHidden = showStage && app.chatHidden;
@@ -383,15 +474,18 @@ function renderRoomLayout() {
 }
 
 function groupMenu(g, x, y) {
-  contextMenu(x, y, [
-    { type: 'title', label: `${g.icon} ${g.name}` },
-    { label: `Convite: ${g.inviteCode} (copiar)`, icon: 'link', onClick: () => { navigator.clipboard.writeText(g.inviteCode); toast('Código copiado! Manda pra quem você quer chamar.', 'success'); } },
-    { label: 'Adicionar pessoa pelo @usuário', icon: 'plus', onClick: () => addMember(g) },
-    { label: 'Renomear / trocar ícone', icon: 'edit', onClick: () => editGroup(g) },
-    { label: 'Gerar novo convite', icon: 'link', onClick: () => api.post(`/groups/${g.id}/invite/reset`).then(() => toast('Novo código gerado.')) },
-    { type: 'sep' },
-    { label: 'Sair do grupo', icon: 'log-out', danger: true, onClick: () => leaveGroup(g) },
-  ]);
+  const items = [{ type: 'title', label: `${g.icon} ${g.name}` }];
+  if (g.inviteCode) items.push({ label: `Convite: ${g.inviteCode} (copiar)`, icon: 'link', onClick: () => { navigator.clipboard.writeText(g.inviteCode); toast('Código copiado! Manda pra quem você quer chamar.', 'success'); } });
+  if (can(app, g, 'invite')) items.push({ label: 'Adicionar pessoa pelo @usuário', icon: 'plus', onClick: () => addMember(g) });
+  if (can(app, g, 'manage_channels')) items.push({ label: 'Criar canal de texto', icon: 'hash', onClick: () => channelDialog(app, g, null, 'text') }, { label: 'Criar canal de voz', icon: 'volume', onClick: () => channelDialog(app, g, null, 'voice') });
+  items.push({ label: 'Configurações do grupo', icon: 'settings', onClick: () => openGroupSettings(g) });
+  if (can(app, g, 'manage_roles')) items.push({ label: 'Classes e permissões', icon: 'shield', onClick: () => openGroupSettings(g, 'roles') });
+  items.push({ type: 'sep' }, { label: 'Sair do grupo', icon: 'log-out', danger: true, onClick: () => leaveGroup(g) });
+  contextMenu(x, y, items);
+}
+
+function openGroupSettings(g, tab) {
+  groupSettings(app, g.id, { tab, iconPicker });
 }
 
 async function addMember(g) {
@@ -481,24 +575,20 @@ function setupStatic() {
     const r = e.currentTarget.getBoundingClientRect();
     if (g) groupMenu(g, r.left, r.bottom + 4);
   };
-  $('[data-icon="volume"]').replaceChildren(icon('volume', 16));
-  $('#channel-chat').onclick = () => {
-    $('#app').classList.remove('nav-open');
-    if (app.chatHidden) app.toggleChat();
-    $('#msg-input').focus();
-  };
-  $('#channel-voice').onclick = () => joinCurrent();
   $('#btn-join-call').onclick = () => {
-    const g = app.group(app.currentGroupId);
-    if (app.call.active && app.call.groupId === g?.id) app.call.leave();
-    else joinCurrent();
+    const voice = roomVoice();
+    if (!voice) return;
+    if (app.call.active && app.call.channelId === voice.id) app.call.leave();
+    else joinVoice(voice.id);
   };
   $('#btn-toggle-chat').onclick = () => app.toggleChat();
   setIcon($('#vp-leave'), 'phone-off', 18);
   $('#vp-leave').onclick = () => app.call.leave();
   $('#voice-panel').onclick = (e) => {
     if (e.target.closest('#vp-leave')) return;
-    if (app.call.active) selectGroup(app.call.groupId);
+    if (!app.call.active) return;
+    const g = app.group(app.call.groupId);
+    selectGroup(app.call.groupId, g?.isDm ? undefined : app.call.channelId);
   };
   $('#me-mic').onclick = () => app.call.toggleMute();
   $('#me-deaf').onclick = () => app.call.toggleDeafen();
@@ -537,17 +627,6 @@ function setupStatic() {
   });
 }
 
-async function joinCurrent() {
-  const id = app.currentGroupId;
-  if (!id) return;
-  try {
-    await app.call.join(id);
-  } catch (err) {
-    console.error(err);
-    toast('Não foi possível entrar na call: ' + err.message, 'error');
-    app.call.active && app.call.leave();
-  }
-}
 
 // =====================================================================
 (async function boot() {

@@ -68,8 +68,10 @@ async function main() {
   const server = USE_HTTPS ? https.createServer(await loadCertificate(), app) : http.createServer(app);
   const io = new Server(server, { maxHttpBufferSize: 1e6 });
   const hub = createHub(io);
-  attachGames(io, hub);
+  const games = attachGames(io, hub);
+  const { COMMANDS } = require('./commands').attachCommands(io, hub, { createGame: games.createGame });
 
+  app.get('/api/commands', auth.requireAuth, (_req, res) => res.json({ commands: COMMANDS }));
   app.use('/api', buildRouter(io, hub));
 
   // Arquivos enviados só para quem está logado

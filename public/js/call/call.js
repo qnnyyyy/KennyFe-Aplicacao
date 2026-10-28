@@ -17,6 +17,8 @@ export class CallController {
     this.socket = app.socket;
     this.active = false;
     this.groupId = null;
+    this.channelId = null; // canal de voz da call
+    this.serverMuted = false;
     this.remotes = new Map(); // peerId -> { userId, state, streams: Map }
     this.muted = false;
     this.deafened = false;
@@ -48,6 +50,32 @@ export class CallController {
       this.refreshTiles();
     });
     s.on('rtc:signal', ({ from, data }) => this.active && this.pm.handleSignal(from, data));
+    // moderação e "bater na porta"
+    s.on('call:kicked', ({ reason }) => {
+      if (!this.active) return;
+      toast(reason || 'Você saiu da call.', 'info', 5000);
+      this.leave(false);
+    });
+    s.on('call:move', ({ channelId, by }) => {
+      toast(`${by} te puxou para outro canal de voz.`, 'info', 4000);
+      this.app.joinVoice(channelId);
+    });
+    s.on('call:server-mute', ({ muted, by }) => {
+      this.serverMuted = muted;
+      if (muted) this.toggleMute(true);
+      toast(muted ? `🔇 ${by} mutou seu microfone nesta call.` : `🎙️ ${by} liberou seu microfone.`, muted ? 'error' : 'success', 5000);
+      this.renderControls();
+    });
+    s.on('call:knock', ({ channelId, userId }) => {
+      if (!this.active || this.channelId !== channelId || userId === this.app.me.id) return;
+      sfx('ring');
+      const t = toast(el('div', { class: 'ring-toast' }, el('span', {}, `🚪 ${this.app.userName(userId)} está batendo na porta da call`),
+        el('button', { class: 'btn btn-primary btn-sm', onclick: () => { this.socket.emit('call:let-in', { userId }); t?.remove?.(); } }, 'Deixar entrar')), 'info', 20000);
+    });
+    s.on('call:let-in', ({ channelId, by }) => {
+      toast(`🚪 ${by} abriu a porta pra você!`, 'success');
+      setTimeout(() => this.app.joinVoice(channelId), 400);
+    });
     s.on('disconnect', () => (this.lostConnection = this.active));
     s.on('connect', () => {
       if (this.lostConnection && this.active) this.rejoin();
@@ -61,14 +89,16 @@ export class CallController {
   }
 
   // ---------- Entrar / sair ----------
-  async join(groupId) {
-    if (this.active && this.groupId === groupId) return;
-    if (this.active) this.leave();
+  async join(channelId) {
+    if (this.active && this.channelId === channelId) return;
+    if (this.active) this.leave(false);
     if (!navigator.mediaDevices?.getUserMedia) {
       toast('Seu navegador bloqueou câmera/microfone: abra pelo localhost ou HTTPS.', 'error', 6000);
     }
     const cfg = await api.get('/config').catch(() => ({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }));
-    this.groupId = groupId;
+    this.channelId = channelId;
+    this.groupId = this.app.channel(channelId)?.groupId ?? null;
+    this.serverMuted = false;
     this.active = true;
     this.remotes.clear();
 
@@ -103,11 +133,13 @@ export class CallController {
       toast('Não consegui abrir o microfone: ' + (err.message || err.name), 'error', 5000);
     }
 
-    const res = await this.socket.emitWithAck('call:join', { groupId, state: this.localState() });
+    const res = await this.socket.emitWithAck('call:join', { channelId, state: this.localState() });
     if (res?.error) {
-      toast(res.error, 'error');
-      return this.leave();
+      if (!res.locked && !res.full) toast(res.error, 'error');
+      this.leave(false);
+      return res;
     }
+    this.groupId = res.groupId;
     this.pm.selfId = res.peerId;
     for (const p of res.peers) {
       this.remotes.set(p.peerId, { userId: p.userId, state: p.state || {}, streams: new Map() });
@@ -118,8 +150,10 @@ export class CallController {
     this.statsTimer = setInterval(() => this.updateStats(), 1000);
     this.pingTimer = setInterval(() => this.updatePings(), 3000);
     this.app.onCallChanged();
+    this.app.music?.onCallChanged();
     this.renderControls();
     this.refreshTiles();
+    return res;
   }
 
   async rejoin() {
@@ -128,7 +162,7 @@ export class CallController {
     const tracks = [...this.pm.localTracks.values()];
     this.pm.closeAll();
     tracks.forEach((t) => this.pm.localTracks.set(t.track.id, t));
-    const res = await this.socket.emitWithAck('call:join', { groupId: this.groupId, state: this.localState() });
+    const res = await this.socket.emitWithAck('call:join', { channelId: this.channelId, state: this.localState() });
     if (res?.error) return this.leave();
     this.pm.selfId = res.peerId;
     for (const p of res.peers) {
@@ -138,7 +172,7 @@ export class CallController {
     this.refreshTiles();
   }
 
-  leave() {
+  leave(sound = true) {
     if (!this.active) return;
     this.coop.stopControl(false);
     this.coop.stopHosting();
@@ -155,7 +189,10 @@ export class CallController {
     this.stage.clear();
     this.remotes.clear();
     this.groupId = null;
-    if (settings().joinSounds) sfx('leave');
+    this.channelId = null;
+    this.serverMuted = false;
+    if (sound && settings().joinSounds) sfx('leave');
+    this.app.music?.onCallChanged();
     this.app.onCallChanged();
   }
 
@@ -266,6 +303,9 @@ export class CallController {
         want.set(`${base}:s:${id}`, { kind: 'screen', peerId, user, name: `${user.displayName} — ${info.name || 'Tela'}`, stream: r.streams.get(id), screenId: id, userId: r.userId, coop: info.coop || null, coopState: info.coop ? this.coop.tileState(peerId, id) : null });
       }
     }
+    // bloco do KenBeat (bot de música) quando está tocando nesta call
+    const mt = this.app.music?.tileInfo();
+    if (mt) want.set('bot:music', mt);
     for (const key of [...this.stage.tiles.keys()]) if (!want.has(key)) this.stage.remove(key);
     for (const [key, info] of want) this.stage.upsert(key, info);
     // tile que o convidado está controlando no Modo Coop
@@ -274,7 +314,9 @@ export class CallController {
     if (c && !ctrlTile && !this.remotes.get(c.peerId)?.state.streams?.[c.screenId]?.coop) this.coop.stopControl(false);
     else this.coop.bindTile(ctrlTile || null);
     for (const t of this.stage.tiles.values()) t.el.classList.toggle('recording', this.recorders.has(t.key));
-    $('#stage-title').textContent = this.app.group(this.groupId)?.name || '';
+    const g = this.app.group(this.groupId);
+    const ch = this.app.channel(this.channelId);
+    $('#stage-title').textContent = g?.isDm ? this.app.groupTitle(g) : `${ch?.emoji || '🔊'} ${ch?.name || ''}`;
   }
 
   async updateStats() {
@@ -305,6 +347,10 @@ export class CallController {
   // ---------- Ações ----------
   // Mudo efetivo = mutado OU ensurdecido (igual ao Discord)
   toggleMute(force) {
+    if (this.serverMuted && force !== true && (this.muted || this.deafened)) {
+      toast('🔇 Um moderador mutou você nesta call.', 'error');
+      return;
+    }
     if (this.deafened && force === undefined) {
       // clicar no mic enquanto ensurdecido: volta a ouvir e a falar
       this.deafened = false;
@@ -403,6 +449,7 @@ export class CallController {
   tileMenu(t, x, y) {
     const { info, key } = t;
     const items = [{ type: 'title', label: info.name }];
+    if (info.kind === 'custom') items.push(...(info.menuItems?.() || []));
     if (!info.isLocal && info.user) items.push(...this.userMenuItems(info.user.id, info.peerId));
     if (info.kind === 'screen' && !info.isLocal && this.audioOut.hasStreamAudio(info.screenId)) {
       items.push({ type: 'slider', label: '🔊 Volume da transmissão', min: 0, max: 200, value: Math.round(this.audioOut.getStreamVolume(info.screenId) * 100), format: (v) => v + '%', onInput: (v) => this.audioOut.setStreamVolume(info.screenId, v / 100) });
@@ -412,7 +459,7 @@ export class CallController {
       items.push({ label: 'Parar esta transmissão', icon: 'stop', danger: true, onClick: () => this.media.stopScreen(info.screenId) });
     }
     items.push({ type: 'sep' });
-    const hasVideo = info.kind !== 'avatar';
+    const hasVideo = info.kind !== 'avatar' && info.kind !== 'custom';
     items.push(
       { label: 'Focar neste bloco', icon: 'focus', onClick: () => this.stage.setFocus(key) },
       { label: 'Dividir 50 / 50', icon: 'columns', onClick: () => this.stage.setRatio(key, 0.5) },

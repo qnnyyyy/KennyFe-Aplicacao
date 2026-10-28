@@ -105,6 +105,14 @@ Funciona como um coop local pela internet. **Quem transmite continua jogando nor
 ### Início (amigos e conversas diretas)
 - Ao entrar no site você cai no **Início**, como no Discord: lista de amigos (online / todos / pendentes), **adicionar amigo pelo @**, conversas diretas (DM) com chat e call, quem está **jogando agora** e as **calls rolando** com botão de entrar.
 
+### Canais, classes e comandos (estilo Discord, só que melhor)
+- **Canais de texto e de voz** em cada grupo, com emoji, descrição e ordem. Clicar num canal de voz já entra na call; cada canal de voz tem **o próprio chat** do lado do palco.
+- Canal de voz **trancado**, **invisível** e com **limite de pessoas**. Quem não pode entrar consegue **🚪 bater na porta** e alguém de dentro deixa entrar.
+- **Classes** (cargos) com cor, emoji e permissões: administrador, editar o grupo, gerenciar canais/classes, expulsar, apagar mensagens, entrar em call trancada, ver canais invisíveis, mover/desconectar e mutar na call, usar o bot de música, abrir jogos e convidar. Nome colorido pela classe e lista de membros separada por classe. Hierarquia: ninguém mexe em quem está no mesmo nível ou acima.
+- Moderação de call: botão direito em alguém → mutar, mover para outro canal, desconectar. Quem pode mover também **arrasta a pessoa** para outro canal de voz.
+- **Comandos com /** (digite / no chat): `/botmusic`, `/pular`, `/pausar`, `/fila`, `/repetir`, `/enquete`, `/dado`, `/moeda`, `/escolher`, `/sortear`, `/bola8`, `/jogar`, `/me`, `/lembrar`, `/limpar`, `/convite`, `/ajuda` e outros.
+- **KenBeat 🎧, o bot de música**: `/botmusic <link do YouTube ou nome>` e ele toca na call em que você está, **sincronizado para todo mundo** (cada um ouve pelo próprio navegador, com volume próprio). Aceita vídeo, playlist, link com tempo (`&t=1m30s`) e busca por nome. Aparece como um bloco na call com capa, barra de progresso (clique para avançar), fila e controles; sai sozinho quando a call fica vazia.
+
 ### Painel do site (só o dono)
 - No Início aparece **📊 Painel do site** apenas para a conta do dono (`ADMIN_USERNAMES`, padrão `kenny_maciel`). Para qualquer outra conta a página e a API (`/api/admin/stats`) nem existem.
 - Mostra: contas, quem está online, ativos por dia (30 dias), cadastros por dia, horas de uso e em call, **lista de quem se inscreveu com e-mail**, data de cadastro, último acesso, tempo de uso de cada um e as **funções mais usadas** (no geral e por pessoa).

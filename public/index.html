@@ -71,10 +71,7 @@
       </header>
       <div class="sidebar-body home-side hidden" id="home-side"></div>
       <div class="sidebar-body group-side" id="group-side">
-        <div class="channel" id="channel-chat"><span class="ch-ic">#</span> conversa</div>
-        <div class="channel voice" id="channel-voice"><span class="ch-ic" data-icon="volume"></span> call <span class="call-count" id="call-count"></span></div>
-        <div class="voice-users" id="voice-users"></div>
-        <div class="sidebar-section">Membros</div>
+        <div class="channel-list" id="channel-list"></div>
         <div class="members" id="members"></div>
       </div>
       <div class="voice-panel hidden" id="voice-panel">
@@ -107,7 +104,7 @@
         <div class="room-resizer hidden" id="room-resizer" title="Arraste para ajustar"></div>
         <section class="chat" id="chat">
           <header class="chat-head">
-            <div class="chat-title"><span class="chat-icon" id="chat-icon"></span><b id="chat-name"></b></div>
+            <div class="chat-title"><span class="chat-icon" id="chat-icon"></span><b id="chat-name"></b><small class="chat-topic" id="chat-topic"></small></div>
             <div class="panel-tabs" id="panel-tabs">
               <button data-tab="chat" class="active">💬 <span>Chat</span></button>
               <button data-tab="games">🎮 <span>Jogos</span><i class="tab-dot hidden" id="games-dot"></i></button>
@@ -122,6 +119,7 @@
           <div class="typing" id="typing"></div>
           <div class="composer-wrap">
             <div class="reply-bar hidden" id="reply-bar"></div>
+            <div class="cmd-pop hidden" id="cmd-pop"></div>
             <div class="composer" id="composer">
               <button class="icon-btn" id="btn-attach" title="Enviar arquivo"></button>
               <textarea id="msg-input" rows="1" placeholder="Mensagem..." maxlength="4000"></textarea>

@@ -56,6 +56,11 @@ const FEATURES = {
   group_join: 'Entrou em grupo por convite',
   profile_edit: 'Editou o perfil',
   coop_download: 'Baixou o Kenfeh Coop',
+  command: 'Usou comandos com /',
+  music_play: 'Pediu música (KenBeat)',
+  music_skip: 'Pulou música',
+  poll_create: 'Criou enquete',
+  poll_vote: 'Votou em enquete',
 };
 // o que o navegador pode registrar sozinho (o resto o servidor já conta)
 const CLIENT_FEATURES = new Set(['soundboard', 'clip', 'cinema', 'coop_guest']);

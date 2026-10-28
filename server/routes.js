@@ -6,6 +6,7 @@ const multer = require('multer');
 const { db, UPLOAD_DIR } = require('./db');
 const auth = require('./auth');
 const stats = require('./stats');
+const guild = require('./guild');
 
 // e-mail: minúsculo, formato simples, sem repetir conta
 function checkEmail(raw, username, exceptUserId = 0) {
@@ -113,17 +114,20 @@ function groupMembers(groupId) {
     .map((u) => ({ ...auth.publicUser(u), role: u.role }));
 }
 
-function groupPayload(g) {
-  const last = db.prepare('SELECT id, created_at FROM messages WHERE group_id = ? ORDER BY id DESC LIMIT 1').get(g.id);
+// viewerId: quem vai receber (os canais e permissões dependem da pessoa)
+function groupPayload(g, viewerId) {
+  const gp = guild.guildPayload(g, viewerId);
+  const canInvite = gp.myPerms.includes('invite') || gp.myPerms.includes('manage_group');
   return {
     id: g.id,
     name: g.name,
     icon: g.icon,
     ownerId: g.owner_id,
-    inviteCode: g.invite_code,
+    inviteCode: canInvite ? g.invite_code : null,
     isDm: Boolean(g.is_dm),
     members: groupMembers(g.id),
-    lastMessageId: last ? last.id : 0,
+    lastMessageId: Math.max(0, ...gp.channels.map((c) => c.lastMessageId)),
+    ...gp,
   };
 }
 
@@ -138,6 +142,7 @@ function messagePayload(m) {
   return {
     id: m.id,
     groupId: m.group_id,
+    channelId: m.channel_id,
     author: auth.publicUser(user),
     type: m.type,
     content: m.content,
@@ -149,10 +154,12 @@ function messagePayload(m) {
   };
 }
 
-function createMessage({ groupId, userId, type = 'text', content = '', mediaUrl = null, replyTo = null }) {
+// sem canal = vai para o primeiro canal de texto do grupo
+function createMessage({ groupId, channelId = null, userId, type = 'text', content = '', mediaUrl = null, replyTo = null }) {
+  if (!channelId) channelId = guild.defaultText(groupId)?.id || null;
   const info = db
-    .prepare('INSERT INTO messages (group_id, user_id, type, content, media_url, reply_to) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(groupId, userId, type, content, mediaUrl, replyTo);
+    .prepare('INSERT INTO messages (group_id, channel_id, user_id, type, content, media_url, reply_to) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(groupId, channelId, userId, type, content, mediaUrl, replyTo);
   return messagePayload(db.prepare('SELECT * FROM messages WHERE id = ?').get(info.lastInsertRowid));
 }
 
@@ -357,10 +364,11 @@ function buildRouter(io, hub) {
       const info = db.prepare("INSERT INTO groups (name, icon, owner_id, invite_code, is_dm) VALUES ('', '💬', ?, ?, 1)").run(req.user.id, inviteCode());
       db.prepare('INSERT INTO group_members (group_id, user_id) VALUES (?, ?), (?, ?)').run(info.lastInsertRowid, req.user.id, info.lastInsertRowid, other.id);
       g = db.prepare('SELECT * FROM groups WHERE id = ?').get(info.lastInsertRowid);
+      guild.ensureChannels(g.id);
     }
     stats.track(req.user.id, 'dm_open');
     notifyGroup(g.id);
-    res.json({ group: groupPayload(g) });
+    res.json({ group: groupPayload(g, req.user.id) });
   });
 
   // ---------- Grupos ----------
@@ -378,8 +386,9 @@ function buildRouter(io, hub) {
     const info = db.prepare('INSERT INTO groups (name, icon, owner_id, invite_code) VALUES (?, ?, ?, ?)').run(name, icon, req.user.id, inviteCode());
     db.prepare("INSERT INTO group_members (group_id, user_id, role) VALUES (?, ?, 'owner')").run(info.lastInsertRowid, req.user.id);
     stats.track(req.user.id, 'group_create');
+    guild.ensureChannels(info.lastInsertRowid);
     notifyGroup(info.lastInsertRowid);
-    res.json({ group: groupPayload(db.prepare('SELECT * FROM groups WHERE id = ?').get(info.lastInsertRowid)) });
+    res.json({ group: groupPayload(db.prepare('SELECT * FROM groups WHERE id = ?').get(info.lastInsertRowid), req.user.id) });
   });
 
   r.post('/groups/join', (req, res) => {
@@ -392,7 +401,7 @@ function buildRouter(io, hub) {
       stats.track(req.user.id, 'group_join');
     }
     notifyGroup(g.id);
-    res.json({ group: groupPayload(g) });
+    res.json({ group: groupPayload(g, req.user.id) });
   });
 
   const loadGroup = (req, res, next) => {
@@ -402,7 +411,9 @@ function buildRouter(io, hub) {
     next();
   };
 
-  r.patch('/groups/:id', loadGroup, (req, res) => {
+  const need = (perm) => (req, res, next) => (guild.can(req.group.id, req.user.id, perm) ? next() : res.status(403).json({ error: 'Sua classe não tem permissão para isso.' }));
+
+  r.patch('/groups/:id', loadGroup, need('manage_group'), (req, res) => {
     const name = req.body.name !== undefined ? String(req.body.name).trim().slice(0, 40) || req.group.name : req.group.name;
     const icon = req.body.icon !== undefined ? String(req.body.icon).slice(0, 8) || req.group.icon : req.group.icon;
     db.prepare('UPDATE groups SET name = ?, icon = ? WHERE id = ?').run(name, icon, req.group.id);
@@ -410,7 +421,7 @@ function buildRouter(io, hub) {
     res.json({ ok: true });
   });
 
-  r.post('/groups/:id/members', loadGroup, (req, res) => {
+  r.post('/groups/:id/members', loadGroup, need('invite'), (req, res) => {
     const username = String(req.body.username || '').trim().toLowerCase();
     const u = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
     if (!u) return res.status(404).json({ error: 'Usuário não encontrado.' });
@@ -440,7 +451,7 @@ function buildRouter(io, hub) {
     res.json({ ok: true });
   });
 
-  r.post('/groups/:id/invite/reset', loadGroup, (req, res) => {
+  r.post('/groups/:id/invite/reset', loadGroup, need('manage_group'), (req, res) => {
     db.prepare('UPDATE groups SET invite_code = ? WHERE id = ?').run(inviteCode(), req.group.id);
     notifyGroup(req.group.id);
     res.json({ ok: true });
@@ -448,9 +459,11 @@ function buildRouter(io, hub) {
 
   r.get('/groups/:id/messages', loadGroup, (req, res) => {
     const before = Number(req.query.before) || Number.MAX_SAFE_INTEGER;
+    const ch = req.query.channel ? guild.getChannel(req.query.channel) : guild.defaultText(req.group.id);
+    if (!ch || ch.group_id !== req.group.id || !guild.access(ch, req.user.id).see) return res.status(404).json({ error: 'Canal não encontrado.' });
     const rows = db
-      .prepare('SELECT * FROM messages WHERE group_id = ? AND id < ? ORDER BY id DESC LIMIT 60')
-      .all(req.group.id, before);
+      .prepare('SELECT * FROM messages WHERE channel_id = ? AND id < ? ORDER BY id DESC LIMIT 60')
+      .all(ch.id, before);
     res.json({ messages: rows.reverse().map(messagePayload), hasMore: rows.length === 60 });
   });
 
@@ -489,7 +502,186 @@ function buildRouter(io, hub) {
     res.json({ ok: true });
   });
 
+  guildRoutes(r, { hub, loadGroup, need, notifyGroup });
   return r;
+}
+
+// ---------- Canais, classes e moderação ----------
+function guildRoutes(r, { hub, loadGroup, need, notifyGroup }) {
+  const EMOJI_MAX = 8;
+  const chFields = (b, old = {}) => {
+    const name = b.name !== undefined ? String(b.name).trim().slice(0, 32) : old.name;
+    return {
+      name: (old.kind || b.kind) === 'text' ? String(name || '').toLowerCase().replace(/\s+/g, '-') || 'canal' : name || 'Canal',
+      emoji: b.emoji !== undefined ? String(b.emoji).slice(0, EMOJI_MAX) : old.emoji || '',
+      topic: b.topic !== undefined ? String(b.topic).slice(0, 160) : old.topic || '',
+      locked: b.locked !== undefined ? (b.locked ? 1 : 0) : old.locked || 0,
+      hidden: b.hidden !== undefined ? (b.hidden ? 1 : 0) : old.hidden || 0,
+      userLimit: b.userLimit !== undefined ? Math.max(0, Math.min(99, Number(b.userLimit) || 0)) : old.user_limit || 0,
+      allowRoles: Array.isArray(b.allowRoles) ? b.allowRoles.map(Number).filter((id) => guild.getRole(id)?.group_id === (old.group_id || b.groupId)) : guild.parse(old.allow_roles, []),
+    };
+  };
+  const loadChannel = (req, res, next) => {
+    const ch = guild.getChannel(req.params.cid);
+    if (!ch || !isMember(ch.group_id, req.user.id) || !guild.access(ch, req.user.id).see) return res.status(404).json({ error: 'Canal não encontrado.' });
+    if (!guild.can(ch.group_id, req.user.id, 'manage_channels')) return res.status(403).json({ error: 'Sua classe não pode mexer nos canais.' });
+    req.channel = ch;
+    next();
+  };
+
+  r.post('/groups/:id/channels', loadGroup, need('manage_channels'), (req, res) => {
+    const kind = req.body.kind === 'voice' ? 'voice' : 'text';
+    if (guild.channelsOf(req.group.id).length >= 60) return res.status(400).json({ error: 'Limite de 60 canais.' });
+    const f = chFields({ ...req.body, kind, groupId: req.group.id });
+    const ch = guild.createChannel(req.group.id, { kind, ...f });
+    notifyGroup(req.group.id);
+    res.json({ channel: guild.channelPayload(ch, req.user.id) });
+  });
+
+  r.patch('/channels/:cid', loadChannel, (req, res) => {
+    const f = chFields(req.body, req.channel);
+    db.prepare('UPDATE channels SET name = ?, emoji = ?, topic = ?, locked = ?, hidden = ?, user_limit = ?, allow_roles = ? WHERE id = ?')
+      .run(f.name, f.emoji, f.topic, f.locked, f.hidden, f.userLimit, JSON.stringify(f.allowRoles), req.channel.id);
+    notifyGroup(req.channel.group_id);
+    hub.recheckChannel?.(req.channel.id);
+    res.json({ ok: true });
+  });
+
+  r.post('/channels/:cid/move', loadChannel, (req, res) => {
+    const ch = req.channel;
+    const list = guild.channelsOf(ch.group_id).filter((c) => c.kind === ch.kind);
+    const i = list.findIndex((c) => c.id === ch.id);
+    const j = i + (Number(req.body.dir) < 0 ? -1 : 1);
+    if (j < 0 || j >= list.length) return res.json({ ok: true });
+    [list[i], list[j]] = [list[j], list[i]];
+    list.forEach((c, k) => db.prepare('UPDATE channels SET position = ? WHERE id = ?').run(k, c.id));
+    notifyGroup(ch.group_id);
+    res.json({ ok: true });
+  });
+
+  r.delete('/channels/:cid', loadChannel, (req, res) => {
+    const ch = req.channel;
+    if (guild.channelsOf(ch.group_id).filter((c) => c.kind === ch.kind).length <= 1)
+      return res.status(400).json({ error: `O grupo precisa de pelo menos um canal de ${ch.kind === 'voice' ? 'voz' : 'texto'}.` });
+    hub.closeChannel?.(ch.id);
+    db.prepare('DELETE FROM messages WHERE channel_id = ?').run(ch.id);
+    db.prepare('DELETE FROM channels WHERE id = ?').run(ch.id);
+    notifyGroup(ch.group_id);
+    res.json({ ok: true });
+  });
+
+  // ----- classes -----
+  const roleFields = (b, old = {}) => ({
+    name: b.name !== undefined ? String(b.name).trim().slice(0, 32) || 'classe' : old.name,
+    color: /^#[0-9a-f]{6}$/i.test(b.color || '') ? b.color : old.color || '#9aa4c3',
+    perms: b.perms !== undefined ? guild.cleanPerms(b.perms) : guild.parse(old.perms, []),
+    hoist: b.hoist !== undefined ? (b.hoist ? 1 : 0) : old.hoist ?? 1,
+    icon: b.icon !== undefined ? String(b.icon).slice(0, 8) : old.icon || '',
+  });
+  // só mexe em classes abaixo da sua (o dono mexe em todas) e não dá poderes que não tem
+  const checkRole = (req, res, role, perms) => {
+    const gid = req.group?.id || role.group_id;
+    if (role && role.position >= guild.topPosition(gid, req.user.id)) return res.status(403).json({ error: 'Essa classe está acima (ou no nível) da sua.' }), false;
+    const mine = guild.permsOf(gid, req.user.id);
+    if (perms && perms.some((p) => !mine.has(p))) return res.status(403).json({ error: 'Você não pode dar uma permissão que não tem.' }), false;
+    return true;
+  };
+  const loadRole = (req, res, next) => {
+    const role = guild.getRole(req.params.rid);
+    if (!role || !isMember(role.group_id, req.user.id)) return res.status(404).json({ error: 'Classe não encontrada.' });
+    if (!guild.can(role.group_id, req.user.id, 'manage_roles')) return res.status(403).json({ error: 'Sua classe não pode gerenciar classes.' });
+    req.role = role;
+    req.group = db.prepare('SELECT * FROM groups WHERE id = ?').get(role.group_id);
+    next();
+  };
+
+  r.post('/groups/:id/roles', loadGroup, need('manage_roles'), (req, res) => {
+    if (req.group.is_dm) return res.status(400).json({ error: 'Conversa direta não tem classes.' });
+    const f = roleFields(req.body);
+    if (!checkRole(req, res, null, f.perms)) return;
+    if (guild.rolesOf(req.group.id).length >= 40) return res.status(400).json({ error: 'Limite de 40 classes.' });
+    // nasce logo abaixo da classe mais alta de quem criou
+    const top = guild.topPosition(req.group.id, req.user.id);
+    const pos = Number.isFinite(top) ? Math.max(0, top) : (db.prepare('SELECT MAX(position) p FROM roles WHERE group_id = ?').get(req.group.id)?.p ?? -1) + 1;
+    if (Number.isFinite(top)) db.prepare('UPDATE roles SET position = position + 1 WHERE group_id = ? AND position >= ?').run(req.group.id, pos);
+    const info = db.prepare('INSERT INTO roles (group_id, name, color, position, perms, hoist, icon) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run(req.group.id, f.name, f.color, pos, JSON.stringify(f.perms), f.hoist, f.icon);
+    notifyGroup(req.group.id);
+    res.json({ role: guild.rolePayload(guild.getRole(info.lastInsertRowid)) });
+  });
+
+  r.patch('/roles/:rid', loadRole, (req, res) => {
+    const f = roleFields(req.body, req.role);
+    const newPerms = f.perms.filter((p) => !guild.parse(req.role.perms, []).includes(p));
+    if (!checkRole(req, res, req.role, newPerms)) return;
+    db.prepare('UPDATE roles SET name = ?, color = ?, perms = ?, hoist = ?, icon = ? WHERE id = ?').run(f.name, f.color, JSON.stringify(f.perms), f.hoist, f.icon, req.role.id);
+    notifyGroup(req.role.group_id);
+    hub.recheckGroup?.(req.role.group_id);
+    res.json({ ok: true });
+  });
+
+  r.post('/roles/:rid/move', loadRole, (req, res) => {
+    const list = guild.rolesOf(req.role.group_id); // do mais alto para o mais baixo
+    const i = list.findIndex((x) => x.id === req.role.id);
+    const j = i + (Number(req.body.dir) < 0 ? -1 : 1); // -1 = subir
+    if (j < 0 || j >= list.length) return res.json({ ok: true });
+    if (!checkRole(req, res, req.role) || !checkRole(req, res, list[j])) return;
+    [list[i], list[j]] = [list[j], list[i]];
+    list.forEach((x, k) => db.prepare('UPDATE roles SET position = ? WHERE id = ?').run(list.length - 1 - k, x.id));
+    notifyGroup(req.role.group_id);
+    res.json({ ok: true });
+  });
+
+  r.delete('/roles/:rid', loadRole, (req, res) => {
+    if (!checkRole(req, res, req.role)) return;
+    db.prepare('DELETE FROM roles WHERE id = ?').run(req.role.id);
+    notifyGroup(req.role.group_id);
+    hub.recheckGroup?.(req.role.group_id);
+    res.json({ ok: true });
+  });
+
+  r.patch('/groups/:id/everyone', loadGroup, need('manage_roles'), (req, res) => {
+    const perms = guild.cleanPerms(req.body.perms).filter((p) => p !== 'admin');
+    db.prepare('UPDATE groups SET everyone_perms = ? WHERE id = ?').run(JSON.stringify(perms), req.group.id);
+    notifyGroup(req.group.id);
+    hub.recheckGroup?.(req.group.id);
+    res.json({ ok: true });
+  });
+
+  // dar/tirar classes de alguém
+  r.put('/groups/:id/members/:uid/roles', loadGroup, need('manage_roles'), (req, res) => {
+    const uid = Number(req.params.uid);
+    if (!isMember(req.group.id, uid)) return res.status(404).json({ error: 'Pessoa não está no grupo.' });
+    const top = guild.topPosition(req.group.id, req.user.id);
+    if (uid !== req.user.id && guild.topPosition(req.group.id, uid) >= top) return res.status(403).json({ error: 'Essa pessoa está no seu nível ou acima.' });
+    const want = new Set((req.body.roleIds || []).map(Number));
+    const current = new Set(guild.memberRoleIds(req.group.id, uid));
+    for (const role of guild.rolesOf(req.group.id)) {
+      const has = current.has(role.id), wants = want.has(role.id);
+      if (has === wants) continue;
+      if (role.position >= top) return res.status(403).json({ error: `A classe "${role.name}" está acima da sua.` });
+      if (wants) db.prepare('INSERT OR IGNORE INTO member_roles (group_id, user_id, role_id) VALUES (?, ?, ?)').run(req.group.id, uid, role.id);
+      else db.prepare('DELETE FROM member_roles WHERE user_id = ? AND role_id = ?').run(uid, role.id);
+    }
+    notifyGroup(req.group.id);
+    hub.recheckGroup?.(req.group.id);
+    res.json({ ok: true });
+  });
+
+  r.delete('/groups/:id/members/:uid', loadGroup, need('kick'), (req, res) => {
+    const uid = Number(req.params.uid);
+    if (uid === req.group.owner_id || uid === req.user.id) return res.status(400).json({ error: 'Não dá para expulsar essa pessoa.' });
+    if (guild.topPosition(req.group.id, uid) >= guild.topPosition(req.group.id, req.user.id)) return res.status(403).json({ error: 'Essa pessoa está no seu nível ou acima.' });
+    const u = db.prepare('SELECT display_name FROM users WHERE id = ?').get(uid);
+    db.prepare('DELETE FROM member_roles WHERE group_id = ? AND user_id = ?').run(req.group.id, uid);
+    db.prepare('DELETE FROM group_members WHERE group_id = ? AND user_id = ?').run(req.group.id, uid);
+    hub.broadcastMessage(createMessage({ groupId: req.group.id, userId: req.user.id, type: 'system', content: `expulsou ${u?.display_name || 'alguém'} do grupo` }));
+    hub.leaveGroupRoom(uid, req.group.id);
+    notifyGroup(req.group.id, [uid]);
+    res.json({ ok: true });
+  });
+
+  r.get('/perms', (_req, res) => res.json({ perms: guild.PERMS.map(([id, name, desc]) => ({ id, name, desc })), everyoneDefault: guild.DEFAULT_EVERYONE }));
 }
 
 module.exports = { buildRouter, isMember, createMessage, messagePayload, groupPayload, groupMembers, UPLOAD_DIR: path.resolve(UPLOAD_DIR) };
