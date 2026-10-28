@@ -99,7 +99,7 @@ async function main() {
   app.use('/v/:build', versioned);
   const html = fs
     .readFileSync(path.join(PUBLIC_DIR, 'index.html'), 'utf8')
-    .replace('href="/css/app.css"', `href="/v/${BUILD}/css/app.css"`)
+    .replaceAll('href="/css/', `href="/v/${BUILD}/css/`)
     .replace('src="/js/main.js"', `src="/v/${BUILD}/js/main.js"`)
     .replaceAll('"/img/', `"/v/${BUILD}/img/`); // imagens também mudam de endereço a cada versão (a Cloudflare guardava o logo antigo)
   const sendIndex = (_req, res) => {

@@ -1,4 +1,5 @@
 // Cartão de perfil (aparece ao clicar em alguém) e prévia na edição do perfil.
+import { applyBanner } from './cosmetics.js';
 import { el, icon, avatar, contextMenu, closeMenu, timeAgo, toast } from './ui.js';
 import { gameEmoji } from './gamesdata.js';
 
@@ -10,9 +11,7 @@ export function activityLine(user, online = true) {
 export function profileCard(app, user, { preview = false } = {}) {
   const online = preview || user.id === app.me?.id || app.online?.has(user.id);
   const banner = el('div', { class: 'pc-banner' });
-  banner.style.background = user.bannerUrl
-    ? `center / cover no-repeat url("${user.bannerUrl}")`
-    : `linear-gradient(135deg, ${user.bannerColor || '#2f7bff'}, color-mix(in srgb, ${user.bannerColor || '#2f7bff'} 45%, #ff4fa3))`;
+  applyBanner(banner, user);
   const act = user.activity && online;
   return el('div', { class: 'profile-card' },
     banner,

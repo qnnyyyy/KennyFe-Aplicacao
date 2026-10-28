@@ -246,10 +246,11 @@ function buildRouter(io, hub) {
     const displayName = req.body.displayName !== undefined ? String(req.body.displayName).trim().slice(0, 32) || u.display_name : u.display_name;
     const color = /^#[0-9a-f]{6}$/i.test(req.body.color || '') ? req.body.color : u.color;
     const statusText = req.body.statusText !== undefined ? String(req.body.statusText).slice(0, 80) : u.status_text;
-    const avatarUrl = req.body.avatarUrl !== undefined ? (String(req.body.avatarUrl).startsWith('/uploads/') ? req.body.avatarUrl : null) : u.avatar_url;
+    const cos = require('./cosmetics');
+    const avatarUrl = req.body.avatarUrl !== undefined ? (cos.validAvatar(String(req.body.avatarUrl || '')) ? req.body.avatarUrl : null) : u.avatar_url;
     const bio = req.body.bio !== undefined ? String(req.body.bio).slice(0, 300) : u.bio;
     const bannerColor = /^#[0-9a-f]{6}$/i.test(req.body.bannerColor || '') ? req.body.bannerColor : u.banner_color;
-    const bannerUrl = req.body.bannerUrl !== undefined ? (String(req.body.bannerUrl || '').startsWith('/uploads/') ? req.body.bannerUrl : null) : u.banner_url;
+    const bannerUrl = req.body.bannerUrl !== undefined ? (cos.validBanner(String(req.body.bannerUrl || '')) ? req.body.bannerUrl : null) : u.banner_url;
     const frame = auth.FRAMES.includes(req.body.frame) ? req.body.frame : u.frame;
     const favoriteGames = Array.isArray(req.body.favoriteGames)
       ? JSON.stringify([...new Set(req.body.favoriteGames.map((g) => String(g).trim().slice(0, 40)).filter(Boolean))].slice(0, 12))

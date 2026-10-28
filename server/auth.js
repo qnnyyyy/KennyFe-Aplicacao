@@ -20,7 +20,7 @@ function verifyPassword(password, stored) {
   return crypto.timingSafeEqual(expected, actual);
 }
 
-const FRAMES = ['none', 'neon', 'fire', 'ice', 'gold', 'rainbow', 'toxic', 'galaxy', 'pixel', 'glitch'];
+const { FRAMES } = require('./cosmetics');
 
 function parseJson(s, fallback) {
   try {

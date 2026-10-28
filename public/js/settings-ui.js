@@ -6,6 +6,7 @@ import { api } from './api.js';
 import { settings, updateSettings, CAMERA_PRESETS, SCREEN_RESOLUTIONS } from './call/settings.js';
 import { listDevices, cleanLabel } from './call/media.js';
 import { keyLabel } from './call/sounds.js';
+import { AVATARS, BANNERS, COS_CATS } from './cosmetics.js';
 
 const PROFILE_COLORS = ['#ff4fa3', '#f72585', '#ff6b6b', '#ffb84c', '#5ce1a0', '#38d6ff', '#3d8bff', '#7b5cff'];
 const BANNER_COLORS = ['#2f7bff', '#7b5cff', '#ff4fa3', '#0f172a', '#14b8a6', '#f97316', '#e11d48', '#22c55e'];
@@ -90,13 +91,31 @@ function accountPane(app) {
     return row;
   };
 
+  // Galerias com filtro por tema (anime, jogos, geek…)
+  const gallery = (items, render, cats = COS_CATS.filter((c) => c[0] !== 'basico' || items.some((x) => x.cat === 'basico'))) => {
+    let cat = 'all';
+    const tabs = el('div', { class: 'cos-tabs' });
+    const grid = el('div', { class: 'cos-grid' });
+    const paint = () => {
+      tabs.replaceChildren(...cats.filter(([id]) => id === 'all' || items.some((x) => x.cat === id)).map(([id, label]) => el('button', { class: cat === id ? 'active' : '', onclick: () => { cat = id; paint(); } }, label)));
+      grid.replaceChildren(...items.filter((x) => cat === 'all' || x.cat === cat).map(render));
+    };
+    paint();
+    return { node: el('div', {}, tabs, grid), grid, paint };
+  };
   // Molduras
-  const frames = el('div', { class: 'frame-grid' });
-  const paintFrames = () => frames.replaceChildren(
-    ...FRAMES.map(([id, label]) => el('button', { class: `frame-opt ${draft.frame === id ? 'active' : ''}`, onclick: () => { draft.frame = id; paintFrames(); renderPreview(); } },
-      avatar({ ...current(), frame: id }, 52), el('small', {}, label)))
-  );
-  paintFrames();
+  const frameItems = FRAMES.map(([id, name, cat]) => ({ id, name, cat: cat || 'basico' }));
+  const framesG = gallery(frameItems, (f) => el('button', { class: `cos-opt ${draft.frame === f.id ? 'active' : ''}`, title: f.name, onclick: () => { draft.frame = f.id; framesG.paint(); renderPreview(); } },
+    avatar({ ...current(), frame: f.id }, 50), el('small', {}, f.name)));
+  const frames = framesG.node;
+  const paintFrames = () => framesG.paint();
+  // Avatares prontos
+  const avatarsG = gallery(AVATARS, (a) => el('button', { class: `cos-opt ${draft.avatarUrl === a.url ? 'active' : ''}`, title: a.name, onclick: () => { draft.avatarUrl = a.url; avatarsG.paint(); paintFrames(); renderPreview(); } },
+    el('img', { src: a.url, alt: '', loading: 'lazy' }), el('small', {}, a.name)));
+  // Fundos animados
+  const bannersG = gallery(BANNERS, (b) => el('button', { class: `cos-opt ${draft.bannerUrl === 'theme:' + b.id ? 'active' : ''}`, title: b.name, onclick: () => { draft.bannerUrl = 'theme:' + b.id; bannersG.paint(); renderPreview(); } },
+    el('div', { class: `bnr-prev bnr bnr-${b.id}` }), el('small', {}, b.name)));
+  bannersG.grid.classList.add('wide');
 
   // Jogos favoritos
   const chips = el('div', { class: 'chips' });
@@ -156,9 +175,9 @@ function accountPane(app) {
         el('div', { class: 'account-form' },
           el('div', { class: 'row-actions' },
             el('button', { class: 'btn btn-ghost btn-sm', onclick: () => upload('avatar', (u) => (draft.avatarUrl = u)) }, '📷 Trocar foto'),
-            el('button', { class: 'btn btn-ghost btn-sm', onclick: () => { draft.avatarUrl = null; renderPreview(); } }, 'Remover foto'),
+            el('button', { class: 'btn btn-ghost btn-sm', onclick: () => { draft.avatarUrl = null; avatarsG.paint(); paintFrames(); renderPreview(); } }, 'Remover foto'),
             el('button', { class: 'btn btn-ghost btn-sm', onclick: () => upload('avatar', (u) => (draft.bannerUrl = u)) }, '🖼️ Imagem do banner'),
-            el('button', { class: 'btn btn-ghost btn-sm', onclick: () => { draft.bannerUrl = null; renderPreview(); } }, 'Tirar banner')
+            el('button', { class: 'btn btn-ghost btn-sm', onclick: () => { draft.bannerUrl = null; bannersG.paint(); renderPreview(); } }, 'Tirar banner')
           ),
           el('label', { class: 'field' }, el('span', {}, 'Nome de exibição'), name),
           el('label', { class: 'field' }, el('span', {}, 'Recado'), status),
@@ -168,7 +187,9 @@ function accountPane(app) {
             el('div', { class: 'field' }, el('span', {}, 'Cor do nome/avatar'), swatches(PROFILE_COLORS, 'color')),
             el('div', { class: 'field' }, el('span', {}, 'Cor do banner'), swatches(BANNER_COLORS, 'bannerColor'))
           ),
-          el('div', { class: 'field' }, el('span', {}, 'Moldura do perfil'), frames),
+          el('div', { class: 'field' }, el('span', {}, '🧑‍🎤 Avatares prontos (ou envie sua foto em "Trocar foto")'), avatarsG.node),
+          el('div', { class: 'field' }, el('span', {}, '🌌 Fundo do perfil animado (ou envie uma imagem em "Imagem do banner")'), bannersG.node),
+          el('div', { class: 'field' }, el('span', {}, '💫 Moldura em volta da foto'), frames),
           el('div', { class: 'field' }, el('span', {}, 'Jogos favoritos (até 12)'), gameInput, datalist, chips),
           el('h4', {}, '🎮 Jogando agora'),
           sw('Mostrar o que estou jogando', 'Aparece no seu perfil e na lista de membros. O agente do PC detecta sozinho (veja "Jogo Coop"), ou você escreve abaixo.', draft.showActivity, (v) => { draft.showActivity = v; renderPreview(); }),

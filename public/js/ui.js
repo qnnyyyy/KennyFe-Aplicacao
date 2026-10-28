@@ -117,18 +117,7 @@ export function avatar(user, size = 36, { frame = true } = {}) {
   return wrap;
 }
 
-export const FRAMES = [
-  ['none', 'Sem moldura'],
-  ['neon', 'Neon'],
-  ['fire', 'Fogo'],
-  ['ice', 'Gelo'],
-  ['gold', 'Ouro'],
-  ['rainbow', 'Arco-íris'],
-  ['toxic', 'Tóxico'],
-  ['galaxy', 'Galáxia'],
-  ['pixel', 'Pixel'],
-  ['glitch', 'Glitch'],
-];
+export { FRAMES } from './cosmetics.js';
 
 export function timeAgo(sec) {
   const d = Math.max(0, Math.floor(Date.now() / 1000 - sec));
