@@ -8,15 +8,24 @@ export function activityLine(user, online = true) {
   return `${gameEmoji(user.activity.name)} Jogando ${user.activity.name}`;
 }
 
+// fontes dos temas (só baixa quando alguém com tema aparece)
+let themeFonts = false;
+function loadThemeFonts() {
+  if (themeFonts) return;
+  themeFonts = true;
+  document.head.append(el('link', { rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=Alegreya+Sans:wght@400;500;700&family=Press+Start+2P&family=Shippori+Mincho:wght@700;800&family=Orbitron:wght@700;900&family=Creepster&family=Audiowide&family=Uncial+Antiqua&display=swap' }));
+}
+
 export function profileCard(app, user, { preview = false } = {}) {
   const online = preview || user.id === app.me?.id || app.online?.has(user.id);
   const banner = el('div', { class: 'pc-banner' });
   applyBanner(banner, user);
   const act = user.activity && online;
   const theme = user.theme && user.theme !== 'none' ? THEME_BY_ID[user.theme] : null;
+  if (theme) loadThemeFonts();
   const name = theme
-    ? el('div', { class: 'pt-nameplate' }, el('i', { class: 'pt-gem' }), el('span', {}, user.displayName))
-    : el('div', { class: 'pc-name', style: { color: user.color } }, user.displayName);
+    ? el('div', { class: 'pt-nameplate' }, el('i', { class: 'pt-gem' }), el('span', { 'data-pf': 'name' }, user.displayName))
+    : el('div', { class: 'pc-name', style: { color: user.color }, 'data-pf': 'name' }, user.displayName);
   return el('div', { class: `profile-card ${theme ? 'pt pt-' + theme.id : ''}` },
     banner,
     user.effect && user.effect !== 'none' ? el('img', { class: 'pc-fx', src: `/img/fx/${user.effect}.svg`, alt: '' }) : null,
@@ -27,13 +36,13 @@ export function profileCard(app, user, { preview = false } = {}) {
     el('div', { class: 'pc-body' },
       name,
       el('div', { class: 'pc-user' }, '@' + (user.username || 'voce')),
-      user.statusText ? el('div', { class: 'pc-status' }, user.statusText) : null,
+      user.statusText ? el('div', { class: 'pc-status', 'data-pf': 'status' }, user.statusText) : null,
       act
         ? el('div', { class: 'pc-activity' },
             el('div', { class: 'pc-act-ic' }, gameEmoji(user.activity.name)),
             el('div', {}, el('small', {}, 'JOGANDO AGORA'), el('b', {}, user.activity.name), el('small', { class: 'muted' }, timeAgo(user.activity.since))))
         : null,
-      user.bio ? el('div', { class: 'pc-section' }, el('h5', {}, 'Sobre mim'), el('p', {}, user.bio)) : null,
+      user.bio ? el('div', { class: 'pc-section' }, el('h5', {}, 'Sobre mim'), el('p', { 'data-pf': 'bio' }, user.bio)) : null,
       user.favoriteGames?.length
         ? el('div', { class: 'pc-section' }, el('h5', {}, 'Jogos favoritos'), el('div', { class: 'chips' }, user.favoriteGames.map((g) => el('span', { class: 'chip game-chip' }, `${gameEmoji(g)} ${g}`))))
         : null

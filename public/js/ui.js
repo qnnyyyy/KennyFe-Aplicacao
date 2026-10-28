@@ -118,7 +118,8 @@ export function avatar(user, size = 36, { frame = true } = {}) {
   if (deco) {
     // camada de trás fica atrás da foto (o dragão/aura passa por trás), a da frente por cima
     if (deco.layers.includes('b')) wrap.prepend(el('img', { class: 'av-deco back', src: `/img/deco/${deco.id}${deco.layers === 'b' ? '' : '-back'}.svg`, alt: '', draggable: 'false' }));
-    if (deco.layers.includes('f')) wrap.append(el('img', { class: 'av-deco', src: `/img/deco/${deco.id}.svg`, alt: '', draggable: 'false' }));
+    const still = deco.kit && size < 56 ? '.s' : '';
+    if (deco.layers.includes('f')) wrap.append(el('img', { class: `av-deco${deco.kit ? ' kit' : ''}`, src: `/img/deco/${deco.id}${still}.svg`, alt: '', draggable: 'false', decoding: 'async' }));
   }
   wrap.style.setProperty('--fw', Math.max(2, Math.round(size * 0.075)) + 'px');
   return wrap;

@@ -67,8 +67,23 @@ function accountPane(app) {
   const email = el('input', { class: 'input', type: 'email', value: me.email || '', maxlength: 120, placeholder: 'voce@email.com', autocomplete: 'email' });
   const bio = el('textarea', { class: 'input', rows: 3, maxlength: 300, placeholder: 'Conta um pouco sobre você, seu main, seu horário de jogo…' }, me.bio || '');
   const current = () => ({ ...me, ...draft, displayName: name.value || me.username, statusText: status.value, bio: bio.value });
-  const renderPreview = () => preview.replaceChildren(profileCard(app, current(), { preview: true }));
-  [name, status, bio].forEach((i) => i.addEventListener('input', renderPreview));
+  // a prévia é refeita no máximo uma vez por quadro; digitar só troca o texto (sem reiniciar as animações)
+  let previewQueued = false;
+  const renderPreview = () => {
+    if (previewQueued) return;
+    previewQueued = true;
+    requestAnimationFrame(() => { previewQueued = false; preview.replaceChildren(profileCard(app, current(), { preview: true })); });
+  };
+  const patchText = () => {
+    const card = preview.firstElementChild;
+    const st = card?.querySelector('[data-pf="status"]');
+    const bi = card?.querySelector('[data-pf="bio"]');
+    if (!card || !!st !== !!status.value || !!bi !== !!bio.value) return renderPreview();
+    card.querySelector('[data-pf="name"]').textContent = name.value || me.username;
+    if (st) st.textContent = status.value;
+    if (bi) bi.textContent = bio.value;
+  };
+  [name, status, bio].forEach((i) => i.addEventListener('input', patchText));
 
   // escolhe a imagem, recorta (círculo para foto, faixa para fundo) e envia
   const upload = (purpose, onDone, kind = 'avatar') => {
@@ -80,9 +95,8 @@ function accountPane(app) {
       if (!f) return;
       try {
         onDone((await api.upload(f, purpose)).url);
-        avatarsG.paint();
-        bannersG.paint();
-        paintFrames();
+        avatarsG.sync();
+        bannersG.sync();
         renderPreview();
         toast(kind === 'banner' ? 'Fundo pronto! Clique em "Salvar perfil".' : 'Foto pronta! Clique em "Salvar perfil".', 'success');
       } catch (err) {
@@ -103,46 +117,60 @@ function accountPane(app) {
   };
 
   // Galerias com filtro por tema (anime, jogos, geek…)
-  const gallery = (items, render, cats = COS_CATS.filter((c) => c[0] !== 'basico' || items.some((x) => x.cat === 'basico'))) => {
+  // Só monta quando a seção é aberta (cada opção anima, então montar tudo de uma vez travava a tela).
+  // Escolher uma opção só troca a marcação (sync) em vez de recriar a grade inteira.
+  const gallery = (items, render, isActive, cats = COS_CATS.filter((c) => c[0] !== 'basico' || items.some((x) => x.cat === 'basico'))) => {
     let cat = 'all';
+    let ready = false;
     const tabs = el('div', { class: 'cos-tabs' });
     const grid = el('div', { class: 'cos-grid' });
+    const sync = () => { for (const b of grid.children) b.classList.toggle('active', isActive(items[b.dataset.i])); };
     const paint = () => {
+      if (!ready) return;
       tabs.replaceChildren(...cats.filter(([id]) => id === 'all' || items.some((x) => x.cat === id)).map(([id, label]) => el('button', { class: cat === id ? 'active' : '', onclick: () => { cat = id; paint(); } }, label)));
-      grid.replaceChildren(...items.filter((x) => cat === 'all' || x.cat === cat).map(render));
+      grid.replaceChildren(...items.filter((x) => cat === 'all' || x.cat === cat).map((x) => { const b = render(x); b.dataset.i = items.indexOf(x); return b; }));
+      sync();
     };
-    paint();
-    return { node: el('div', {}, tabs, grid), grid, paint };
+    const activate = () => { if (!ready) { ready = true; paint(); } else sync(); };
+    return { node: el('div', {}, tabs, grid), grid, paint, sync, activate };
+  };
+  // seção recolhível: abre uma por vez
+  const section = (title, g, hint) => {
+    const d = el('details', { class: 'cos-sec' }, el('summary', {}, el('span', {}, title), hint ? el('small', { class: 'muted' }, hint) : null), g.node);
+    d.addEventListener('toggle', () => {
+      if (!d.open) return;
+      g.activate();
+      for (const o of d.parentElement?.querySelectorAll('details.cos-sec[open]') || []) if (o !== d) o.open = false;
+    });
+    return d;
   };
   // Molduras
   const frameItems = FRAMES.map(([id, name, cat]) => ({ id, name, cat: cat || 'basico' }));
-  const framesG = gallery(frameItems, (f) => el('button', { class: `cos-opt ${draft.frame === f.id ? 'active' : ''}`, title: f.name, onclick: () => { draft.frame = f.id; framesG.paint(); renderPreview(); } },
-    avatar({ ...current(), frame: f.id }, 50), el('small', {}, f.name)));
-  const frames = framesG.node;
-  const paintFrames = () => framesG.paint();
+  const framesG = gallery(frameItems, (f) => el('button', { class: 'cos-opt', title: f.name, onclick: () => { draft.frame = f.id; framesG.sync(); renderPreview(); } },
+    avatar({ ...current(), frame: f.id, deco: 'none' }, 50), el('small', {}, f.name)), (f) => draft.frame === f.id);
   // Avatares prontos
-  const avatarsG = gallery(AVATARS, (a) => el('button', { class: `cos-opt ${draft.avatarUrl === a.url ? 'active' : ''}`, title: a.name, onclick: () => { draft.avatarUrl = a.url; avatarsG.paint(); paintFrames(); renderPreview(); } },
-    el('img', { src: a.url, alt: '', loading: 'lazy' }), el('small', {}, a.name)));
+  const avatarsG = gallery(AVATARS, (a) => el('button', { class: 'cos-opt', title: a.name, onclick: () => { draft.avatarUrl = a.url; avatarsG.sync(); renderPreview(); } },
+    el('img', { src: a.url, alt: '', loading: 'lazy' }), el('small', {}, a.name)), (a) => draft.avatarUrl === a.url);
   // Fundos animados
-  const bannersG = gallery(BANNERS, (b) => el('button', { class: `cos-opt ${draft.bannerUrl === 'theme:' + b.id ? 'active' : ''}`, title: b.name, onclick: () => { draft.bannerUrl = 'theme:' + b.id; bannersG.paint(); renderPreview(); } },
-    el('div', { class: `bnr-prev bnr bnr-${b.id}` }), el('small', {}, b.name)));
+  const bannersG = gallery(BANNERS, (b) => el('button', { class: 'cos-opt', title: b.name, onclick: () => { draft.bannerUrl = 'theme:' + b.id; bannersG.sync(); renderPreview(); } },
+    el('div', { class: `bnr-prev bnr bnr-${b.id}` }), el('small', {}, b.name)), (b) => draft.bannerUrl === 'theme:' + b.id);
   bannersG.grid.classList.add('wide');
   // Decorações que passam da foto e efeitos no cartão
-  const decosG = gallery(DECOS, (d) => el('button', { class: `cos-opt deco-opt ${draft.deco === d.id ? 'active' : ''}`, title: d.name, onclick: () => { draft.deco = d.id; decosG.paint(); renderPreview(); } },
-    avatar({ ...current(), frame: draft.frame, deco: d.id }, 46), el('small', {}, d.name)));
-  const effectsG = gallery(EFFECTS, (x) => el('button', { class: `cos-opt ${draft.effect === x.id ? 'active' : ''}`, title: x.name, onclick: () => { draft.effect = x.id; effectsG.paint(); renderPreview(); } },
-    el('div', { class: 'fx-prev' }, x.id !== 'none' ? el('img', { src: `/img/fx/${x.id}.svg`, alt: '' }) : '—'), el('small', {}, x.name)));
+  const decosG = gallery(DECOS, (d) => el('button', { class: 'cos-opt deco-opt', title: d.name, onclick: () => { draft.deco = d.id; decosG.sync(); renderPreview(); } },
+    avatar({ ...current(), frame: 'none', deco: d.id }, 46), el('small', {}, d.name)), (d) => draft.deco === d.id);
+  const effectsG = gallery(EFFECTS, (x) => el('button', { class: 'cos-opt', title: x.name, onclick: () => { draft.effect = x.id; effectsG.sync(); renderPreview(); } },
+    el('div', { class: 'fx-prev' }, x.id !== 'none' ? el('img', { src: `/img/fx/${x.id}.svg`, alt: '' }) : '—'), el('small', {}, x.name)), (x) => draft.effect === x.id);
   effectsG.grid.classList.add('wide');
   // Temas completos (um clique aplica fundo + decoração + nameplate + badges)
-  const themesG = gallery(THEMES, (t) => el('button', { class: `cos-opt theme-opt ${draft.theme === t.id ? 'active' : ''}`, title: t.name, onclick: () => {
+  const themesG = gallery(THEMES, (t) => el('button', { class: 'cos-opt theme-opt', title: t.name, onclick: () => {
     draft.theme = t.id;
     if (t.deco) { draft.deco = t.deco; draft.frame = 'none'; }
     if (t.banner) draft.bannerUrl = t.banner;
-    themesG.paint(); decosG.paint(); bannersG.paint(); framesG.paint(); renderPreview();
+    themesG.sync(); decosG.sync(); bannersG.sync(); framesG.sync(); renderPreview();
   } },
     t.id === 'none' ? el('div', { class: 'theme-prev none' }, '—')
-      : el('div', { class: `theme-prev pt-${t.id}` }, el('div', { class: `bnr bnr-${t.banner.slice(6)}` }), avatar({ ...current(), frame: 'none', deco: t.deco }, 40)),
-    el('small', {}, t.name)));
+      : el('div', { class: `theme-prev pt pt-${t.id}` }, el('div', { class: `bnr bnr-${t.banner.slice(6)}` }), avatar({ ...current(), frame: 'none', deco: t.deco }, 40)),
+    el('small', {}, t.name)), (t) => draft.theme === t.id);
   themesG.grid.classList.add('wide');
 
   // Jogos favoritos
@@ -203,9 +231,9 @@ function accountPane(app) {
         el('div', { class: 'account-form' },
           el('div', { class: 'row-actions' },
             el('button', { class: 'btn btn-ghost btn-sm', onclick: () => upload('avatar', (u) => (draft.avatarUrl = u)) }, '📷 Trocar foto'),
-            el('button', { class: 'btn btn-ghost btn-sm', onclick: () => { draft.avatarUrl = null; avatarsG.paint(); paintFrames(); renderPreview(); } }, 'Remover foto'),
+            el('button', { class: 'btn btn-ghost btn-sm', onclick: () => { draft.avatarUrl = null; avatarsG.sync(); renderPreview(); } }, 'Remover foto'),
             el('button', { class: 'btn btn-ghost btn-sm', onclick: () => upload('avatar', (u) => (draft.bannerUrl = u), 'banner') }, '🖼️ Imagem do banner'),
-            el('button', { class: 'btn btn-ghost btn-sm', onclick: () => { draft.bannerUrl = null; bannersG.paint(); renderPreview(); } }, 'Tirar banner')
+            el('button', { class: 'btn btn-ghost btn-sm', onclick: () => { draft.bannerUrl = null; bannersG.sync(); renderPreview(); } }, 'Tirar banner')
           ),
           el('label', { class: 'field' }, el('span', {}, 'Nome de exibição'), name),
           el('label', { class: 'field' }, el('span', {}, 'Recado'), status),
@@ -215,12 +243,13 @@ function accountPane(app) {
             el('div', { class: 'field' }, el('span', {}, 'Cor do nome/avatar'), swatches(PROFILE_COLORS, 'color')),
             el('div', { class: 'field' }, el('span', {}, 'Cor do banner'), swatches(BANNER_COLORS, 'bannerColor'))
           ),
-          el('div', { class: 'field' }, el('span', {}, '🎴 Tema de perfil completo (fundo, decoração, nameplate e badges de uma vez)'), themesG.node),
-          el('div', { class: 'field' }, el('span', {}, '🧑‍🎤 Avatares prontos (ou envie sua foto em "Trocar foto")'), avatarsG.node),
-          el('div', { class: 'field' }, el('span', {}, '🌌 Fundo do perfil animado (ou envie uma imagem em "Imagem do banner")'), bannersG.node),
-          el('div', { class: 'field' }, el('span', {}, '💫 Moldura em volta da foto'), frames),
-          el('div', { class: 'field' }, el('span', {}, '🐦‍⬛ Decoração especial (passa do limite da foto — combina com a moldura)'), decosG.node),
-          el('div', { class: 'field' }, el('span', {}, '✨ Efeito no cartão de perfil (anima por cima de tudo)'), effectsG.node),
+          el('div', { class: 'cos-secs' },
+            section('🎴 Tema de perfil completo', themesG, 'fundo, decoração, nameplate e badges de uma vez'),
+            section('🧑‍🎤 Avatares prontos', avatarsG, 'ou envie sua foto em "Trocar foto"'),
+            section('🌌 Fundo do perfil animado', bannersG, 'ou envie uma imagem em "Imagem do banner"'),
+            section('💫 Moldura em volta da foto', framesG),
+            section('🐉 Decoração especial', decosG, 'passa do limite da foto'),
+            section('✨ Efeito no cartão de perfil', effectsG)),
           el('div', { class: 'field' }, el('span', {}, 'Jogos favoritos (até 12)'), gameInput, datalist, chips),
           el('h4', {}, '🎮 Jogando agora'),
           sw('Mostrar o que estou jogando', 'Aparece no seu perfil e na lista de membros. O agente do PC detecta sozinho (veja "Jogo Coop"), ou você escreve abaixo.', draft.showActivity, (v) => { draft.showActivity = v; renderPreview(); }),
