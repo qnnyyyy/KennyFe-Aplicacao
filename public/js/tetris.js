@@ -639,10 +639,13 @@ function blip(freqs, dur = 0.08, type = 'square', vol = 0.05) {
 // =====================================================================
 // INTERFACE DO JOGO (montada pela aba Jogos)
 // =====================================================================
-const DEFAULT_CFG = { das: 133, arr: 10, sdf: 'fast', casual: false, sound: true };
+const DEFAULT_CFG = { das: 133, arr: 10, sdf: 'normal', casual: false, sound: true };
+// ↓ / S descem a peça aos poucos (segurando); só o Espaço derruba de uma vez
+const SOFT_MS = { slow: 110, normal: 65, fast: 35 };
 const KEYS = {
   ArrowLeft: 'left', ArrowRight: 'right', ArrowDown: 'soft', Space: 'hard', ArrowUp: 'cw', KeyX: 'cw', KeyZ: 'ccw',
-  ControlLeft: 'ccw', ControlRight: 'ccw', KeyA: 'r180', KeyC: 'hold', ShiftLeft: 'hold', ShiftRight: 'hold',
+  KeyA: 'left', KeyD: 'right', KeyS: 'soft', KeyW: 'cw', KeyQ: 'ccw', KeyE: 'r180',
+  ControlLeft: 'ccw', ControlRight: 'ccw', KeyC: 'hold', ShiftLeft: 'hold', ShiftRight: 'hold',
 };
 
 export class TetrisGame {
@@ -651,6 +654,7 @@ export class TetrisGame {
     this.app = hub.app;
     this.socket = hub.socket;
     this.cfg = { ...DEFAULT_CFG, ...store('tetris-cfg', {}) };
+    if (!SOFT_MS[this.cfg.sdf]) this.cfg.sdf = 'normal'; // config antiga ("instantâneo") não existe mais
     this.boards = {};
     this.flash = {};
     this.engine = null;
@@ -664,7 +668,8 @@ export class TetrisGame {
     this.onKeyUp = (e) => this.key(e, false);
     window.addEventListener('keydown', this.onKeyDown, true);
     window.addEventListener('keyup', this.onKeyUp, true);
-    this.ro = new ResizeObserver(() => this.layoutOpponents());
+    // girar o celular / redimensionar: refaz o layout se mudou de "estreito" para "largo"
+    this.ro = new ResizeObserver(() => (this.s && this.narrow !== undefined && this.narrow !== (window.innerWidth < 640) ? this.render() : this.layoutOpponents()));
     this.ro.observe(this.root);
     this.loop = this.loop.bind(this);
     this.raf = requestAnimationFrame(this.loop);
@@ -684,8 +689,8 @@ export class TetrisGame {
 
   setFull(on) {
     this.full = on;
-    document.getElementById('games-view').classList.toggle('tetris-full', on);
-    setTimeout(() => this.layoutOpponents(), 50);
+    this.hub.setFull?.(on, true);
+    setTimeout(() => (this.s ? this.render() : this.layoutOpponents()), 50);
   }
 
   mySkin() {
@@ -704,12 +709,13 @@ export class TetrisGame {
       this.round = st.round;
       this.boards = {};
       this.engine = null;
+      this.oppCanvases = null;
       this.countdownEnd = performance.now() + 3400;
       if (iPlay) {
         this.engine = new Engine(st.seed, { casual: this.cfg.casual, on: this.engineEvents() });
         this.lastSent = 0;
         this.sendBoard(true);
-        if (this.root.clientWidth < 760) this.setFull(true);
+        if (this.root.clientWidth < 760 || window.innerWidth < 640) this.setFull(true);
       }
     }
     if (st.phase === 'playing' && prevPhase !== 'playing') {
@@ -757,6 +763,10 @@ export class TetrisGame {
   onBoard(idx, b) {
     if (b.round !== this.s?.state.round) return;
     this.boards[idx] = b;
+    if (this.chipsEl && (b.inc || 0) !== (this._lastInc?.[idx] || 0)) {
+      (this._lastInc ||= {})[idx] = b.inc || 0;
+      this.renderChips();
+    }
     const c = this.oppCanvases?.get(Number(idx));
     if (c) this.drawOpp(Number(idx), c);
   }
@@ -812,7 +822,11 @@ export class TetrisGame {
     else if (act === 'ccw') eng.rotate(-1);
     else if (act === 'r180') eng.rotate(2);
     else if (act === 'hold') eng.holdPiece();
-    else if (act === 'soft' && this.cfg.sdf === 'instant') while (eng.softStep());
+    else if (act === 'soft') {
+      // desce 1 linha na hora e depois continua descendo aos poucos enquanto segurar
+      eng.softStep();
+      eng.gravAcc = 0;
+    }
   }
 
   loop(t) {
@@ -836,9 +850,7 @@ export class TetrisGame {
           }
         }
       }
-      const soft = this.held.has('soft') ? (this.cfg.sdf === 'instant' ? 1 : 22) : 0;
-      if (soft === 1) while (eng.softStep());
-      eng.tick(dt, soft);
+      eng.tick(dt, this.held.has('soft') ? SOFT_MS[this.cfg.sdf] : 0);
       if (eng.dirty) {
         this.sendBoard();
       }
@@ -920,17 +932,43 @@ export class TetrisGame {
 
     this.topbar.replaceChildren(
       el('span', { class: 'tt-xp' }, `⭐ ${xp} XP`, el('small', {}, nextUnlock(xp))),
-      el('span', { class: 'tt-phase' }, { lobby: 'Sala de espera', countdown: 'Preparar…', playing: `${st.alive.filter(Boolean).length} vivo(s)`, over: 'Fim da rodada' }[st.phase]),
-      el('button', { class: 'btn btn-ghost btn-sm', onclick: () => this.setFull(!this.full) }, this.full ? '🗗 Reduzir' : '⛶ Tela cheia')
+      el('span', { class: 'tt-phase' }, { lobby: 'Sala de espera', countdown: 'Preparar…', playing: `${st.alive.filter(Boolean).length} vivo(s)`, over: 'Fim da rodada' }[st.phase])
     );
 
+    this.chipsEl = null;
+    this.oppCanvases = null;
     if (st.phase === 'lobby' || (st.phase === 'over' && !this.engine && !Object.keys(this.boards).length)) return this.renderLobby();
 
     // área: meu tabuleiro (se jogo) + oponentes vivos
     this.arena.replaceChildren();
     this.myCanvas = null;
     const main = el('div', { class: 'tt-main' });
-    if (iPlay && this.engine) {
+    const narrow = window.innerWidth < 640;
+    this.narrow = narrow;
+    if (iPlay && this.engine && narrow) {
+      // celular: só o seu tabuleiro, grande; adversários recolhidos numa faixa
+      const vw = window.innerWidth, vh = window.innerHeight;
+      this.myCell = Math.max(14, Math.min(Math.floor((vw - 40) / 10), Math.floor((vh - (this.showOpps ? 470 : 330)) / 20)));
+      this.myCanvas = el('canvas', { class: 'tt-board' });
+      this.holdCanvas = el('canvas', { class: 'tt-mini' });
+      this.nextCanvases = [0, 1, 2].map(() => el('canvas', { class: 'tt-mini' }));
+      this.meter = el('i');
+      this.statsEl = el('div', { class: 'tt-stats row' });
+      this.clearEl = el('div', { class: 'tt-clear' });
+      this.cdEl = el('div', { class: 'tt-countdown hidden' });
+      this.myCanvas.addEventListener('pointerdown', () => this.cfg.casual && this.action('hard', true));
+      main.classList.add('mobile');
+      main.append(
+        el('div', { class: 'tt-mrow' },
+          el('div', { class: 'tt-box' }, el('small', {}, 'HOLD'), this.holdCanvas),
+          this.statsEl,
+          el('div', { class: 'tt-box next' }, el('small', {}, 'PRÓXIMAS'), el('div', { class: 'tt-next-row' }, ...this.nextCanvases))),
+        el('div', { class: 'tt-board-wrap' }, el('div', { class: 'tt-meter' }, this.meter), el('div', { class: 'tt-board-inner' }, this.myCanvas, this.clearEl, this.cdEl,
+          this.engine.dead ? el('div', { class: 'tt-dead' }, el('b', {}, st.places[s.me] ? `#${st.places[s.me]}` : 'K.O.'), el('small', {}, 'Você caiu — assistindo')) : null)),
+        this.touchControls()
+      );
+      this.engine.dirty = true;
+    } else if (iPlay && this.engine) {
       this.myCell = this.full ? 30 : 24;
       this.myCanvas = el('canvas', { class: 'tt-board' });
       this.holdCanvas = el('canvas', { class: 'tt-mini' });
@@ -953,9 +991,24 @@ export class TetrisGame {
       main.append(el('div', { class: 'tt-spectate' }, st.phase === 'over' ? '' : '👀 Assistindo esta rodada — você entra na próxima.'), this.cdEl);
     }
     this.oppWrap = el('div', { class: 'tt-opps' });
-    this.arena.append(main, this.oppWrap);
+    if (narrow && iPlay && this.engine) {
+      // faixa compacta dos adversários (toque para ver os tabuleiros)
+      const alive = s.players.map((_, i) => i).filter((i) => i !== s.me && st.playing[i] && st.alive[i]);
+      this.chipsEl = el('div', { class: 'tt-chips' });
+      const toggle = el('button', { class: 'btn btn-ghost btn-sm', onclick: () => { this.showOpps = !this.showOpps; this.render(); } }, this.showOpps ? '🙈 Esconder adversários' : `👀 Ver adversários (${alive.length})`);
+      this.arena.append(main, el('div', { class: 'tt-opp-bar' }, toggle, this.chipsEl), ...(this.showOpps ? [this.oppWrap] : []));
+      this.renderChips();
+      if (!this.showOpps) this.oppWrap = null;
+    } else this.arena.append(main, this.oppWrap);
     if (st.phase === 'over') this.arena.append(this.resultsPanel());
     this.layoutOpponents();
+  }
+
+  renderChips() {
+    if (!this.chipsEl || !this.s) return;
+    const st = this.s.state;
+    const list = this.s.players.map((_, i) => i).filter((i) => i !== this.s.me && st.playing[i] && st.alive[i]);
+    this.chipsEl.replaceChildren(...list.map((i) => el('span', { class: 'tt-chip' }, this.s.names[i], (this.boards[i]?.inc || 0) > 0 ? el('em', {}, `⬆${this.boards[i].inc}`) : null)));
   }
 
   layoutOpponents() {
@@ -968,7 +1021,7 @@ export class TetrisGame {
     const availW = Math.max(120, area.width || this.root.clientWidth * (iPlay ? 0.4 : 1));
     const availH = Math.max(160, (this.root.clientHeight || 500) - 80);
     let cell = 4, cols = 1, fit = list.length;
-    for (let c = iPlay ? 20 : 26; c >= 4; c--) {
+    for (let c = this.narrow && iPlay ? 11 : iPlay ? 20 : 26; c >= 4; c--) {
       const bw = W * c + 16, bh = VIS * c + 30;
       cols = Math.max(1, Math.floor(availW / bw));
       const rows = Math.max(1, Math.floor(availH / bh));
@@ -1035,7 +1088,7 @@ export class TetrisGame {
           el('p', { class: 'muted' }, `${s.players.length} jogador(es) na sala. Limpe linhas para mandar lixo nos outros — combos, T-spins e Tetris (4 linhas) atacam mais. O último de pé vence!`),
           s.me >= 0 ? el('button', { class: 'btn btn-primary btn-lg', onclick: () => this.hub.emit({ type: 'start' }) }, s.players.length > 1 ? '▶ Começar partida' : '▶ Treinar sozinho') : el('p', { class: 'muted' }, 'Entre na partida para jogar.'),
           el('div', { class: 'tt-keys' },
-            ...[['← →', 'mover'], ['↓', 'descer'], ['Espaço', 'cair na hora'], ['↑ / X', 'girar'], ['Z / Ctrl', 'girar ao contrário'], ['A', 'girar 180°'], ['C / Shift', 'guardar (hold)']].map(([k, d]) => el('span', {}, el('kbd', {}, k), d))
+            ...[['← → / A D', 'mover'], ['↓ / S', 'descer aos poucos (segure)'], ['Espaço', 'cair de uma vez'], ['↑ / W / X', 'girar'], ['Z / Q / Ctrl', 'girar ao contrário'], ['E', 'girar 180°'], ['C / Shift', 'guardar (hold)']].map(([k, d]) => el('span', {}, el('kbd', {}, k), d))
           ),
           el('h4', {}, `Estilos de torre — você tem ${xp} XP`),
           skins
@@ -1044,8 +1097,8 @@ export class TetrisGame {
           el('h4', {}, '⚙️ Controles'),
           num('DAS (atraso para repetir)', 'das', 40, 300),
           num('ARR (velocidade de repetição)', 'arr', 0, 60),
-          el('label', { class: 'field' }, el('span', {}, 'Descer (↓)'), el('select', { class: 'input', onchange: (e) => { this.cfg.sdf = e.target.value; this.saveCfg(); } },
-            el('option', { value: 'fast', selected: this.cfg.sdf === 'fast' }, 'Rápido'), el('option', { value: 'instant', selected: this.cfg.sdf === 'instant' }, 'Instantâneo'))),
+          el('label', { class: 'field' }, el('span', {}, 'Velocidade ao descer (↓ / S)'), el('select', { class: 'input', onchange: (e) => { this.cfg.sdf = e.target.value; this.saveCfg(); } },
+            [['slow', 'Devagar'], ['normal', 'Normal'], ['fast', 'Rápido']].map(([v, t]) => el('option', { value: v, selected: this.cfg.sdf === v }, t)))),
           tog('Modo casual', 'Velocidade constante, mais tempo pra encaixar e toque no tabuleiro = cair na hora.', 'casual'),
           tog('Sons', null, 'sound')
         )
@@ -1053,15 +1106,21 @@ export class TetrisGame {
     );
   }
 
+  // botões de toque (celular/tablet): segurar ◀ ▶ repete, segurar ▼ desce aos poucos, ⤓ cai de uma vez
   touchControls() {
-    const b = (label, act) => {
-      const n = el('button', { class: 'tt-touch-btn' }, label);
-      n.addEventListener('pointerdown', (e) => { e.preventDefault(); this.action(act, true); });
-      n.addEventListener('pointerup', () => this.action(act, false));
-      n.addEventListener('pointercancel', () => this.action(act, false));
+    const b = (label, act, hint, cls = '') => {
+      const n = el('button', { class: `tt-touch-btn ${cls}`, title: hint }, label, el('small', {}, hint));
+      n.addEventListener('pointerdown', (e) => { e.preventDefault(); n.setPointerCapture?.(e.pointerId); this.action(act, true); });
+      const up = () => this.action(act, false);
+      n.addEventListener('pointerup', up);
+      n.addEventListener('pointercancel', up);
+      n.addEventListener('lostpointercapture', up);
+      n.addEventListener('contextmenu', (e) => e.preventDefault());
       return n;
     };
-    return el('div', { class: 'tt-touch' }, b('⟲', 'ccw'), b('◀', 'left'), b('▼', 'soft'), b('▶', 'right'), b('⟳', 'cw'), b('⤓', 'hard'), b('H', 'hold'));
+    return el('div', { class: 'tt-touch' },
+      b('H', 'hold', 'guardar'), b('⟲', 'ccw', 'girar'), b('⟳', 'cw', 'girar'), b('⤓', 'hard', 'cair', 'hard'),
+      b('◀', 'left', 'esq.'), b('▼', 'soft', 'descer'), b('▶', 'right', 'dir.'));
   }
 }
 

@@ -1,7 +1,7 @@
 // Modo Jogo Coop: quem transmite deixa amigos jogarem no PC dele.
 //   amigo (navegador) --P2P--> host (navegador) --localhost--> agente Kenfeh Coop --> SendInput / controle virtual
 // Nada chega no PC sem o host aprovar, e ele pode cortar tudo na hora (Ctrl+Shift+X).
-import { el, icon, toast, modal, sfx, store, save, $ } from '../ui.js';
+import { el, icon, toast, modal, sfx, store, save, $, IS_MOBILE } from '../ui.js';
 import { api } from '../api.js';
 
 const AGENT_URL = 'ws://localhost:47821';
@@ -290,6 +290,7 @@ export class CoopController {
   }
 
   request(peerId, screenId) {
+    if (IS_MOBILE) return this.mobileNotice();
     const st = this.tileState(peerId, screenId);
     if (st === 'playing') return this.stopControl();
     if (st === 'pending') return;
@@ -499,7 +500,20 @@ export class CoopController {
   }
 
   // =================== DIÁLOGO DO HOST ===================
+  mobileNotice() {
+    modal({
+      title: '🕹️ Modo Jogo Coop',
+      content: el('div', { class: 'mobile-coop-note' },
+        el('div', { class: 'mobile-coop-ic' }, '💻'),
+        el('b', {}, 'O Modo Jogo Coop não está disponível no celular'),
+        el('p', { class: 'muted' }, 'Para jogar junto no PC de alguém (como jogador 2, 3 ou 4), entre pelo computador. Quem transmite o jogo precisa de Windows com o app Kenfeh Coop; quem joga junto só precisa de um computador com navegador, com controle ou teclado e mouse.'),
+        el('p', { class: 'muted' }, 'Os minijogos da aba Jogos (Tetris Royale, Desenha & Adivinha, Reflexo, Lig 4, Jogo da velha) funcionam normalmente no celular!')),
+      actions: [{ label: 'Entendi', primary: true, onClick: (c) => c() }],
+    });
+  }
+
   openHostDialog() {
+    if (IS_MOBILE) return this.mobileNotice();
     const body = el('div', { class: 'coop-dialog' });
     const st = {
       screenId: this.hosting?.screenId || [...(this.call.media?.screens.keys() || [])][0] || '',

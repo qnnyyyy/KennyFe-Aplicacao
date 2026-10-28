@@ -1,5 +1,5 @@
 // Controlador da call: junta mídia local, conexões, áudio, palco e controles.
-import { el, $, icon, setIcon, toast, modal, contextMenu, popover, closeMenu, sfx, onContext } from '../ui.js';
+import { el, $, icon, setIcon, toast, modal, contextMenu, popover, closeMenu, sfx, onContext, IS_MOBILE } from '../ui.js';
 import { api } from '../api.js';
 import { PeerManager } from './rtc.js';
 import { LocalMedia, listDevices, cleanLabel } from './media.js';
@@ -457,16 +457,16 @@ export class CallController {
         split(b(this.muted || this.deafened ? 'mic-off' : 'mic', 'Microfone (Ctrl+Shift+M)', () => this.toggleMute(), this.muted || this.deafened ? 'off' : ''), (a) => this.micPopover(a)),
         b(this.deafened ? 'headphones-off' : 'headphones', 'Ensurdecer (Ctrl+Shift+D)', () => this.toggleDeafen(), this.deafened ? 'off' : ''),
         split(b(m.camera ? 'video' : 'video-off', 'Câmera', () => this.toggleCamera(), m.camera ? 'on' : ''), (a) => this.cameraPopover(a)),
-        el('button', { class: `cc-btn ${screens ? 'on' : ''}`, title: 'Compartilhar tela (pode ser mais de uma)', onclick: (e) => (screens ? this.screensPopover(e.currentTarget) : this.shareDialog()) },
+        !navigator.mediaDevices?.getDisplayMedia ? null : el('button', { class: `cc-btn ${screens ? 'on' : ''}`, title: 'Compartilhar tela (pode ser mais de uma)', onclick: (e) => (screens ? this.screensPopover(e.currentTarget) : this.shareDialog()) },
           icon('monitor-up', 22), screens ? el('span', { class: 'cc-count' }, screens) : null),
         b('sliders', 'Mixer: escolher quais áudios transmitir', () => this.openMixer()),
-        el('button', { class: `cc-btn ${this.coop.hosting ? 'on' : ''}`, title: 'Modo Jogo Coop: deixar amigos jogarem no seu PC', onclick: () => this.coop.openHostDialog() }, el('span', { class: 'cc-emoji' }, '🕹️')),
+        IS_MOBILE ? null : el('button', { class: `cc-btn ${this.coop.hosting ? 'on' : ''}`, title: 'Modo Jogo Coop: deixar amigos jogarem no seu PC', onclick: () => this.coop.openHostDialog() }, el('span', { class: 'cc-emoji' }, '🕹️')),
         el('button', { class: 'cc-btn', title: 'Soundboard', onclick: (e) => this.soundboard(e.currentTarget) }, el('span', { class: 'cc-emoji' }, '📣'))
       ),
       el('div', { class: 'cc-group' },
         b(this.layoutIcon(), 'Layout', (e) => this.layoutPopover(e.currentTarget)),
         b('message', 'Mostrar/esconder chat', () => this.app.toggleChat()),
-        b('cinema', cinema ? 'Sair do modo cinema' : 'Modo cinema (esconde as barras)', () => this.toggleCinema(), cinema ? 'on' : ''),
+        IS_MOBILE ? null : b('cinema', cinema ? 'Sair do modo cinema' : 'Modo cinema (esconde as barras)', () => this.toggleCinema(), cinema ? 'on' : ''),
         b(fs ? 'minimize' : 'maximize', fs ? 'Sair da tela cheia (Esc)' : 'Tela cheia (F)', () => this.toggleFullscreen(), fs ? 'on' : ''),
         b('settings', 'Configurações de voz e vídeo', () => this.app.openSettings('voice'))
       ),

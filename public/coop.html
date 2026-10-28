@@ -81,6 +81,9 @@
     .final { text-align: center; padding: 50px 24px; border-radius: 28px; background: radial-gradient(circle at 20% 0, rgba(47,123,255,.35), transparent 55%), radial-gradient(circle at 80% 100%, rgba(255,79,163,.3), transparent 55%), var(--panel); box-shadow: inset 0 0 0 1px var(--line-2); }
     .final h2 { margin-bottom: 8px; }
     .warn { padding: 14px 18px; border-radius: 16px; background: rgba(255,204,77,.08); box-shadow: inset 0 0 0 1px rgba(255,204,77,.3); color: #ffe4a3; font-size: 14.5px; margin-top: 18px; }
+    .mobile-banner { display: none; margin: 4px 0 0; padding: 14px 16px; border-radius: 16px; background: rgba(255,204,77,.1); box-shadow: inset 0 0 0 1px rgba(255,204,77,.35); color: #ffe4a3; font-size: 15px; }
+    .is-mobile .mobile-banner { display: block; }
+    .pc-only { display: inline-flex; gap: 6px; align-items: center; padding: 6px 12px; border-radius: 99px; background: rgba(255,204,77,.14); color: #ffcc4d; font-size: 13.5px; font-weight: 700; margin-left: 8px; }
     footer { padding: 40px 0 60px; color: var(--text-3); font-size: 13.5px; text-align: center; }
     @media (max-width: 860px) {
       header.hero, .who, .modes { grid-template-columns: 1fr; }
@@ -91,6 +94,7 @@
   </style>
 </head>
 <body>
+  <script>if (/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches)) document.documentElement.classList.add('is-mobile');</script>
   <div class="blobs" aria-hidden="true"><span></span><span></span></div>
   <div class="wrap">
     <nav>
@@ -100,14 +104,15 @@
 
     <header class="hero">
       <div>
-        <span class="tag">🕹️ Modo Jogo Coop</span>
+        <span class="tag">🕹️ Modo Jogo Coop</span><span class="pc-only">💻 Só no computador</span>
+        <div class="mobile-banner">📵 <b>Você está no celular.</b> O Modo Jogo Coop não funciona no celular — abra esta página no computador. Quem transmite precisa de <b>Windows</b>; quem joga junto precisa de um <b>computador</b> com navegador. (Os minijogos do site, como o Tetris Royale, funcionam no celular!)</div>
         <h1>Joguem <em>juntos</em> no mesmo PC — cada um de casa.</h1>
         <p class="lead">Você transmite o jogo na call e seus amigos jogam com você como <b>jogadores separados</b> (Jogador 2, 3 e 4), igual a um coop local no sofá. Eles não instalam nada.</p>
         <div class="cta">
           <a class="btn btn-primary btn-lg" href="/download/KenfehCoop.exe" download>⬇️ Baixar Kenfeh Coop</a>
           <a class="btn btn-ghost" href="#passo-a-passo">Ver o passo a passo</a>
         </div>
-        <p class="small" style="margin-top:14px">Windows 10 ou 11 • um arquivo só (~6 MB) • só quem transmite o jogo precisa baixar</p>
+        <p class="small" style="margin-top:14px">Windows 10 ou 11 • um arquivo só (~6 MB) • só quem transmite o jogo precisa baixar • não funciona no celular</p>
       </div>
       <div class="mock" aria-hidden="true">
         <div class="mock-head"><b>Kenfeh Coop</b><small>Seus amigos jogam no seu PC como jogadores separados</small></div>
@@ -201,8 +206,8 @@
         <p>Funciona em jogos que aceitam mais de um controle (coop local). Jogos com anti-cheat — Valorant, CS2, Fortnite, etc. — podem bloquear ou punir controle simulado, então não use neles. Se o jogo roda como Administrador, abra o Kenfeh Coop como Administrador também (botão direito → Executar como administrador).</p></details>
       <details><summary>Tem atraso?</summary>
         <p>O comando do amigo vai direto para o seu PC (conexão ponto a ponto), então o atraso é praticamente o da própria transmissão da tela — normalmente entre 50 e 150 ms.</p></details>
-      <details><summary>O amigo pode usar celular?</summary>
-        <p>Pode assistir e conversar, mas para jogar é melhor um computador com controle ou teclado e mouse.</p></details>
+      <details open><summary>Funciona no celular?</summary>
+        <p><b>Não.</b> O Modo Jogo Coop é só para computador: quem transmite precisa de um PC com Windows (com o app Kenfeh Coop) e quem joga junto precisa de um computador com navegador (com controle ou teclado e mouse). No celular dá para assistir à transmissão e conversar na call — e os minijogos do site (Tetris Royale, Desenha & Adivinha, Reflexo, Lig 4, Jogo da velha) funcionam normalmente.</p></details>
     </section>
 
     <section>

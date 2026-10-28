@@ -1,7 +1,7 @@
 // "Palco" da call: blocos de vídeo redimensionáveis (arrasta as divisórias),
 // blocos flutuantes (ex.: webcam por cima do filme), reordenação,
 // tela cheia por bloco, janela separada e Picture-in-Picture.
-import { el, icon, avatar, store, save, onContext } from '../ui.js';
+import { el, icon, avatar, store, save, onContext, IS_MOBILE } from '../ui.js';
 
 const MIN_PX = 90;
 
@@ -151,7 +151,8 @@ export class Stage {
     t.el.classList.toggle('coop', coop);
     t.el.classList.toggle('controlling', coop && info.coopState === 'playing');
     t.coopHint.classList.toggle('hidden', !(coop && info.coopState === 'playing'));
-    if (coop) t.coopBtn.textContent = { idle: '🎮 Pedir para jogar', pending: '⏳ Esperando o host…', playing: '✋ Parar de jogar' }[info.coopState] || '🎮 Pedir para jogar';
+    if (coop) t.coopBtn.textContent = IS_MOBILE ? '💻 Coop só no computador' : { idle: '🎮 Pedir para jogar', pending: '⏳ Esperando o host…', playing: '✋ Parar de jogar' }[info.coopState] || '🎮 Pedir para jogar';
+    t.coopBtn.classList.toggle('disabled', IS_MOBILE);
     t.badge.textContent = info.kind === 'screen' ? (info.coop ? 'COOP' : 'AO VIVO') : '';
     const fit = this.fit[t.key] || (info.kind === 'screen' ? 'contain' : 'cover');
     t.video.style.objectFit = fit;

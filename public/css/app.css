@@ -910,8 +910,11 @@ kbd { min-width: 170px; padding: 5px 10px; border-radius: 8px; background: rgba(
 .tt-skin.active { box-shadow: inset 0 0 0 2px var(--blue); background: rgba(61,139,255,.12); }
 .tt-skin.locked { opacity: .45; cursor: not-allowed; }
 .tt-skin.locked canvas { filter: grayscale(1) blur(.5px); }
-.tt-touch { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; width: 100%; max-width: 420px; }
-.tt-touch-btn { height: 52px; border-radius: 12px; background: rgba(255,255,255,.08); font-size: 20px; touch-action: none; }
+.tt-touch { display: grid; grid-template-columns: repeat(12, 1fr); gap: 6px; width: 100%; max-width: 420px; user-select: none; -webkit-user-select: none; }
+.tt-touch-btn { grid-column: span 3; height: 52px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; border-radius: 12px; background: rgba(255,255,255,.08); font-size: 20px; line-height: 1; touch-action: none; -webkit-touch-callout: none; }
+.tt-touch-btn:nth-child(n+5) { grid-column: span 4; }
+.tt-touch-btn small { font-size: 9.5px; font-weight: 600; color: var(--text-3); letter-spacing: .3px; }
+.tt-touch-btn.hard { background: linear-gradient(135deg, rgba(61,139,255,.35), rgba(255,79,163,.35)); }
 .tt-touch-btn:active { background: rgba(61,139,255,.35); }
 @media (max-width: 900px) { .tt-lobby { grid-template-columns: 1fr; } .tt-side { width: 84px; } }
 
@@ -1014,3 +1017,82 @@ kbd { min-width: 170px; padding: 5px 10px; border-radius: 8px; background: rgba(
 .kb-legend-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px 12px; font-size: 12.5px; color: var(--text-2); }
 .kb-legend kbd { min-width: 0; margin-right: 6px; padding: 1px 6px; font-size: 11.5px; }
 @media (max-width: 720px) { .coop-intro { grid-template-columns: 1fr; } }
+
+/* =========================================================
+   CELULAR (ajustes gerais) + avisos do Modo Coop
+   ========================================================= */
+.side-nav > .ic { flex: none; }
+.pc-only-pill { display: inline-block; vertical-align: middle; margin-left: 6px; padding: 2px 8px; border-radius: 99px; font-size: 11.5px; font-weight: 700; background: rgba(255,204,77,.14); color: var(--yellow); }
+.mobile-warn { margin: 6px 0 0; padding: 10px 12px; border-radius: 12px; background: rgba(255,204,77,.1); box-shadow: inset 0 0 0 1px rgba(255,204,77,.3); color: #ffe4a3; font-size: 13.5px; }
+.tile-coop.disabled { background: rgba(0,0,0,.65); box-shadow: none; }
+.mobile-coop-note { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; }
+.mobile-coop-ic { font-size: 54px; }
+.mobile-coop-note b { font-size: 17px; }
+.mobile-coop-note p { margin: 4px 0; }
+@media (max-width: 720px) {
+  .home-tabs { flex-wrap: nowrap; }
+  .home-tabs button { padding: 6px 9px; font-size: 13px; }
+  .home-hero { padding: 16px; }
+  .home-hero h2 { font-size: 20px; }
+  .hero-actions .btn { flex: 1 1 auto; padding: 9px 12px; font-size: 14px; }
+  .add-box { flex-wrap: wrap; padding: 8px; }
+  .add-box .input { min-width: 0; }
+  .add-box .btn { width: 100%; }
+  .friend-row { padding: 10px 4px; gap: 10px; }
+  .friend-actions { gap: 4px; }
+  .call-controls { left: 6px; right: 6px; transform: none; justify-content: flex-start; }
+  .stage-wrap.idle .call-controls { transform: translateY(20px); }
+  .cc-group { gap: 3px; }
+  .cc-group + .cc-group { padding-left: 5px; }
+  .cc-btn { width: 40px; height: 40px; border-radius: 12px; }
+  .cc-arrow { width: 18px; }
+  .cc-btn.danger { width: 48px; }
+  .tt-main { flex-wrap: nowrap; gap: 6px; }
+  .tt-side { width: 62px; gap: 6px; }
+  .tt-box { padding: 5px; }
+  .tt-stats .tt-stat:nth-child(n+3) { display: none; }
+  .tt-stat b { font-size: 14px; }
+  .tt-top { flex-wrap: wrap; gap: 6px; }
+  .tt-xp small { display: none; }
+  .tt-arena { gap: 10px; }
+  .tt-opps { min-width: 100%; }
+  .game-head { padding: 10px; gap: 8px; }
+  .game-players { order: 3; flex-basis: 100%; }
+  .hub { padding: 14px; }
+  .hub-coop { flex-direction: column; gap: 6px; }
+  .modal-body { padding: 8px 16px 16px; }
+  .modal-head { padding: 14px 14px 4px 16px; }
+  .modal-actions { padding: 12px 16px 16px; }
+  .modal-actions .btn { flex: 1 1 auto; }
+  .sticker-grid { grid-template-columns: repeat(3, 1fr); }
+  .emoji-grid { grid-template-columns: repeat(7, 1fr); }
+  .studio-tools .tool-btn { min-width: 56px; padding: 8px; }
+  .profile-pop { max-height: calc(100dvh - 16px); }
+  .msg-tools { right: 6px; }
+  .room.with-stage .chat { height: 45%; }
+  .tile-coop { font-size: 12.5px; padding: 7px 12px; }
+}
+
+/* ---------- Tetris no celular: só o seu tabuleiro, grande ---------- */
+.tt-main.mobile { flex-direction: column; align-items: center; flex-wrap: nowrap; gap: 8px; width: 100%; }
+.tt-mrow { display: flex; align-items: stretch; justify-content: center; gap: 6px; width: 100%; max-width: 420px; }
+.tt-mrow .tt-box { padding: 4px 6px; gap: 3px; }
+.tt-mrow .tt-box.next { flex: 1; }
+.tt-next-row { display: flex; gap: 6px; align-items: center; }
+.tt-stats.row { flex-direction: row; gap: 4px; }
+.tt-stats.row .tt-stat { display: flex; flex-direction: column; justify-content: center; padding: 4px 6px; text-align: center; }
+.tt-stats.row .tt-stat:nth-child(n+3) { display: none; }
+.tt-stats.row .tt-stat b { font-size: 14px; }
+.tt-opp-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; width: 100%; }
+.tt-chips { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.tt-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; background: rgba(255,255,255,.06); font-size: 12px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tt-chip em { font-style: normal; font-weight: 800; color: #ff7a59; }
+.games-view.tetris-full { display: flex; flex-direction: column; }
+.games-view.tetris-full > :last-child { flex: 1; min-height: 0; overflow: auto; }
+@media (max-width: 640px) {
+  .games-view.tetris-full .game-head { padding: 6px 10px; }
+  .games-view.tetris-full .game-players, .games-view.tetris-full .game-title small { display: none; }
+  .games-view.tetris-full .tt-top { display: none; }
+  .tt-main.mobile .tt-touch { max-width: 420px; }
+  .tt-main.mobile .tt-touch-btn { height: 56px; }
+}

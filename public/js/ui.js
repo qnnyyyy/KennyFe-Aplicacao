@@ -20,6 +20,11 @@ export function el(tag, attrs = {}, ...children) {
 }
 
 export const $ = (sel, root = document) => root.querySelector(sel);
+
+// celular/tablet (sem mouse): algumas funções, como o Modo Jogo Coop, são só para computador
+export const IS_MOBILE =
+  /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches);
+if (IS_MOBILE) document.documentElement.classList.add('is-mobile');
 export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
 // Ícones no estilo "lucide" (traço 2px)

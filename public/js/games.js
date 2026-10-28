@@ -1,5 +1,5 @@
 // Aba "Jogos": minijogos multiplayer do grupo + catálogo de jogos grátis + Jogo Coop.
-import { el, $, $$, icon, toast, sfx } from './ui.js';
+import { el, $, $$, icon, toast, sfx, IS_MOBILE } from './ui.js';
 import { FREE_GAMES } from './gamesdata.js';
 import { TetrisGame } from './tetris.js';
 
@@ -46,6 +46,15 @@ export class GamesHub {
     });
   }
 
+  // tela cheia do jogo (no celular principalmente): esconde chat, barras etc.
+  setFull(on, fromGame = false) {
+    this.full = on;
+    this.view.classList.toggle('tetris-full', on);
+    if (!fromGame && this.mounted?.game instanceof TetrisGame) this.mounted.game.full = on;
+    if (this.sessions.get(this.app.currentGroupId)) this.view.firstChild?.replaceWith(this.header(this.sessions.get(this.app.currentGroupId)));
+    if (!fromGame) setTimeout(() => this.mounted?.game.render?.(), 50);
+  }
+
   setTab(tab) {
     this.tab = tab;
     $$('#panel-tabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
@@ -75,6 +84,7 @@ export class GamesHub {
     if (!s) {
       this.mounted?.game.destroy?.();
       this.mounted = null;
+      if (this.full) this.setFull(false);
       return this.renderHub();
     }
     const key = `${gid}:${s.type}`;
@@ -99,8 +109,9 @@ export class GamesHub {
         s.players.map((uid, i) => el('span', { class: `gp ${i === s.me ? 'gp-me' : ''}` }, s.names[i], el('em', {}, s.scores[i] ?? 0)))
       ),
       el('div', { class: 'game-head-actions' },
+        el('button', { class: 'btn btn-ghost btn-sm', title: 'Tela cheia', onclick: () => this.setFull(!this.full) }, this.full ? '🗗 Reduzir' : '⛶ Tela cheia'),
         !meIn && !full ? el('button', { class: 'btn btn-primary btn-sm', onclick: () => this.socket.emit('game:join', { groupId: s.groupId }, (r) => r?.error && toast(r.error, 'error')) }, 'Entrar na partida') : null,
-        meIn ? el('button', { class: 'btn btn-ghost btn-sm', onclick: () => this.socket.emit('game:leave', { groupId: s.groupId }) }, 'Sair') : null,
+        meIn ? el('button', { class: 'btn btn-ghost btn-sm', onclick: () => this.socket.emit('game:leave', { groupId: s.groupId }) }, 'Sair da partida') : null,
         s.hostId === this.app.me.id ? el('button', { class: 'btn btn-danger btn-sm', onclick: () => this.socket.emit('game:end', { groupId: s.groupId }) }, 'Encerrar') : null
       )
     );
@@ -125,9 +136,10 @@ export class GamesHub {
         el('section', { class: 'hub-coop' },
           el('div', { class: 'hub-coop-ic' }, '🕹️'),
           el('div', {},
-            el('h3', {}, 'Jogo Coop pela tela'),
+            el('h3', {}, 'Jogo Coop pela tela ', el('span', { class: 'pc-only-pill' }, '💻 só no computador')),
+            IS_MOBILE ? el('p', { class: 'mobile-warn' }, '📵 Não disponível no celular. Entre pelo computador para usar o Modo Coop. (Os minijogos acima funcionam no celular!)') : null,
             el('p', { class: 'muted small' }, 'Compartilhe a tela do seu jogo em "Modo Coop": você continua jogando e cada amigo vira um jogador separado no SEU PC (Jogador 2, 3, 4) — como um coop local. Os amigos não instalam nada. Ideal para It Takes Two, Cuphead, Overcooked, emuladores…'),
-            el('div', { class: 'inline-form' },
+            IS_MOBILE ? null : el('div', { class: 'inline-form' },
               el('button', { class: 'btn btn-primary btn-sm', onclick: () => this.app.call.coop.openHostDialog() }, '🎮 Abrir Modo Coop'),
               el('a', { class: 'btn btn-ghost btn-sm', href: '/coop', target: '_blank', rel: 'noopener' }, '⬇️ Baixar app / passo a passo'))
           )
