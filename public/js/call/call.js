@@ -89,7 +89,14 @@ export class CallController {
   }
 
   // ---------- Entrar / sair ----------
-  async join(channelId) {
+  // evita abrir a call duas vezes (clique duplo enquanto ainda está conectando)
+  join(channelId) {
+    if (this.joining) return this.joining;
+    this.joining = this._join(channelId).finally(() => (this.joining = null));
+    return this.joining;
+  }
+
+  async _join(channelId) {
     if (this.active && this.channelId === channelId) return;
     if (this.active) this.leave(false);
     if (!navigator.mediaDevices?.getUserMedia) {

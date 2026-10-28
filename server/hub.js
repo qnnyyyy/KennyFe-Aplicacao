@@ -246,6 +246,8 @@ function createHub(io) {
       if (ch.user_limit && others >= ch.user_limit && !a.bypassLimit && socket.data.callChannel !== ch.id)
         return ack?.({ error: `Call lotada (${ch.user_limit} pessoas).`, full: true, channelId: ch.id });
       if (socket.data.callChannel) leaveCall(socket);
+      // uma call por pessoa: se já estava em call em outra aba/aparelho, aquela sai (senão a voz sai em dobro)
+      for (const s of online.get(userId) || []) if (s !== socket && s.data.callChannel) kick(s, 'Você entrou na call em outra aba ou aparelho.');
       calls.set(ch.id, call);
       const peers = callSnapshot(ch.id);
       const wasEmpty = call.size === 0;
