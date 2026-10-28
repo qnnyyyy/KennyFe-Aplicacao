@@ -92,6 +92,8 @@ addUserCol('frame', "TEXT NOT NULL DEFAULT 'none'");
 addUserCol('favorite_games', "TEXT NOT NULL DEFAULT '[]'");
 addUserCol('show_activity', 'INTEGER NOT NULL DEFAULT 1');
 addUserCol('activity', 'TEXT'); // JSON { name, since, source }
+addUserCol('tetris_xp', 'INTEGER NOT NULL DEFAULT 0');
+addUserCol('tetris_skin', "TEXT NOT NULL DEFAULT 'classic'");
 
 // Limpa sessões expiradas a cada inicialização
 db.prepare('DELETE FROM sessions WHERE expires_at < unixepoch()').run();

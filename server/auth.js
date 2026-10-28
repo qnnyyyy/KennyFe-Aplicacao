@@ -48,6 +48,8 @@ function publicUser(u) {
     showActivity,
     // o "jogando agora" só sai se a pessoa permitir
     activity: showActivity ? parseJson(u.activity, null) : null,
+    tetrisXp: u.tetris_xp || 0,
+    tetrisSkin: u.tetris_skin || 'classic',
   };
 }
 

@@ -226,6 +226,9 @@ function buildRouter(io, hub) {
       ? JSON.stringify([...new Set(req.body.favoriteGames.map((g) => String(g).trim().slice(0, 40)).filter(Boolean))].slice(0, 12))
       : u.favorite_games;
     const showActivity = req.body.showActivity !== undefined ? (req.body.showActivity ? 1 : 0) : u.show_activity;
+    const { TETRIS_SKINS } = require('./tetris-skins');
+    const skin = TETRIS_SKINS.find((k) => k.id === req.body.tetrisSkin && (u.tetris_xp || 0) >= k.xp);
+    if (skin) db.prepare('UPDATE users SET tetris_skin = ? WHERE id = ?').run(skin.id, u.id);
     db.prepare(
       `UPDATE users SET display_name = ?, color = ?, status_text = ?, avatar_url = ?, bio = ?, banner_color = ?, banner_url = ?,
        frame = ?, favorite_games = ?, show_activity = ? WHERE id = ?`

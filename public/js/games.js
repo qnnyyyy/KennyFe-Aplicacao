@@ -1,8 +1,10 @@
 // Aba "Jogos": minijogos multiplayer do grupo + catálogo de jogos grátis + Jogo Coop.
 import { el, $, $$, icon, toast, sfx } from './ui.js';
 import { FREE_GAMES } from './gamesdata.js';
+import { TetrisGame } from './tetris.js';
 
 const BUILTIN = [
+  { type: 'tetris', icon: '🧱', name: 'Tetris Royale', desc: 'Estilo TETR.IO: mande lixo, sobreviva, seja o último. Libera estilos de torre!', players: '1–16' },
   { type: 'draw', icon: '🎨', name: 'Desenha & Adivinha', desc: 'Um desenha, a galera adivinha. Estilo Gartic.', players: '2–12' },
   { type: 'reaction', icon: '⚡', name: 'Reflexo', desc: 'Ficou verde? Clica! Quem é o mais rápido?', players: '1–16' },
   { type: 'connect4', icon: '🔴', name: 'Lig 4', desc: 'Alinhe 4 peças antes do outro.', players: '2' },
@@ -35,6 +37,10 @@ export class GamesHub {
       this.sessions.delete(groupId);
       if (groupId === app.currentGroupId) this.render();
     });
+    const toGame = (ev, fn) => this.socket.on(ev, (d) => d.groupId === app.currentGroupId && this.mounted?.game[fn]?.(d));
+    toGame('tetris:board', 'onBoardEvt');
+    toGame('tetris:garbage', 'onGarbageEvt');
+    toGame('tetris:attackfx', 'onAttackFx');
     this.socket.on('game:stroke', ({ groupId, stroke }) => {
       if (groupId === app.currentGroupId && this.mounted?.game.onStroke) this.mounted.game.onStroke(stroke);
     });
@@ -74,7 +80,7 @@ export class GamesHub {
     const key = `${gid}:${s.type}`;
     if (this.mounted?.key !== key) {
       this.mounted?.game.destroy?.();
-      const Cls = { tictactoe: TicTacToe, connect4: Connect4, draw: DrawGame, reaction: Reaction }[s.type];
+      const Cls = { tictactoe: TicTacToe, connect4: Connect4, draw: DrawGame, reaction: Reaction, tetris: TetrisGame }[s.type];
       const game = new Cls(this);
       this.view.replaceChildren(this.header(s), game.root);
       this.mounted = { key, game };

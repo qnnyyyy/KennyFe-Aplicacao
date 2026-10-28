@@ -203,6 +203,72 @@ const GAMES = {
 
   // Teste de reflexo: espera ficar verde e clica o mais rápido possível.
   // O tempo é medido no aparelho de cada um, então a internet não atrapalha.
+  // Tetris battle royale: cada um simula o próprio tabuleiro (zero lag nos controles);
+  // o servidor cuida da sala, da contagem, de quem está vivo e de para onde vai o lixo.
+  tetris: {
+    name: 'Tetris Royale',
+    min: 1,
+    max: 16,
+    init: () => ({ phase: 'lobby', round: 0, seed: 0, startAt: 0, alive: [], playing: [], places: [], winner: null, lastResults: null }),
+    action(s, playerIdx, a, hub) {
+      const st = s.state;
+      if ((a.type === 'start' && st.phase === 'lobby') || (a.type === 'restart' && st.phase === 'over')) {
+        clearTimeout(s.timer);
+        st.phase = 'countdown';
+        st.round++;
+        st.seed = Math.floor(Math.random() * 2 ** 31);
+        st.startAt = now() + 3500;
+        st.playing = s.players.map(() => true);
+        st.alive = s.players.map(() => true);
+        st.places = s.players.map(() => null);
+        st.winner = null;
+        s.boards = {};
+        s.lines = s.players.map(() => 0);
+        s.timer = setTimeout(() => {
+          st.phase = 'playing';
+          hub.emitGame(s);
+        }, 3500);
+        return;
+      }
+      if (a.type === 'dead' && (st.phase === 'playing' || st.phase === 'countdown') && st.alive[playerIdx]) {
+        s.lines[playerIdx] = Math.max(s.lines[playerIdx] || 0, Math.min(999, Number(a.lines) || 0));
+        GAMES.tetris.eliminate(s, playerIdx, hub);
+      }
+    },
+    eliminate(s, idx, hub) {
+      const st = s.state;
+      st.alive[idx] = false;
+      const left = st.alive.filter(Boolean).length;
+      st.places[idx] = left + 1;
+      const total = st.playing.filter(Boolean).length;
+      if (left <= (total > 1 ? 1 : 0)) GAMES.tetris.finish(s, hub);
+    },
+    finish(s, hub) {
+      const st = s.state;
+      clearTimeout(s.timer);
+      const w = st.alive.findIndex(Boolean);
+      if (w >= 0) {
+        st.places[w] = 1;
+        st.winner = w;
+        st.alive[w] = false;
+      }
+      st.phase = 'over';
+      // XP: linhas limpas + bônus pela colocação
+      const results = [];
+      s.players.forEach((uid, i) => {
+        if (!st.playing[i]) return;
+        const total = st.playing.filter(Boolean).length;
+        const lines = Math.min(200, s.lines[i] || 0);
+        const xp = lines + (st.places[i] === 1 && total > 1 ? 60 : 0) + Math.max(5, (total - (st.places[i] || total)) * 8);
+        db.prepare('UPDATE users SET tetris_xp = tetris_xp + ? WHERE id = ?').run(xp, uid);
+        if (st.places[i] === 1 && total > 1) s.scores[i] = (s.scores[i] || 0) + 1;
+        results.push({ idx: i, place: st.places[i], lines, xp, totalXp: db.prepare('SELECT tetris_xp FROM users WHERE id = ?').get(uid)?.tetris_xp || 0 });
+        hub.broadcastUser?.(uid);
+      });
+      st.lastResults = results.sort((a, b) => a.place - b.place);
+    },
+  },
+
   reaction: {
     name: 'Reflexo',
     min: 1,
@@ -273,6 +339,7 @@ function attachGames(io, hub) {
       max: def.max,
       me: idx,
       state: def.view ? def.view(s, idx) : s.state,
+      boards: s.type === 'tetris' ? s.boards || {} : undefined,
     };
   };
 
@@ -319,6 +386,13 @@ function attachGames(io, hub) {
       s.names.push(userName(userId));
       s.scores.push(0);
       if (inProgress) s.state.order.push(s.players.length - 1);
+      if (s.type === 'tetris') {
+        s.state.alive.push(false);
+        s.state.playing.push(false);
+        s.state.places.push(null);
+        s.lines = s.lines || [];
+        s.lines.push(0);
+      }
       hub.emitGame(s);
       ack?.({ ok: true });
     });
@@ -333,6 +407,14 @@ function attachGames(io, hub) {
       s.players.splice(idx, 1);
       s.names.splice(idx, 1);
       s.scores.splice(idx, 1);
+      if (s.type === 'tetris') {
+        const st = s.state;
+        if (st.alive[idx] && (st.phase === 'playing' || st.phase === 'countdown')) GAMES.tetris.eliminate(s, idx, hub);
+        for (const k of ['alive', 'playing', 'places']) st[k].splice(idx, 1);
+        if (st.winner === idx) st.winner = null;
+        s.lines?.splice(idx, 1);
+        s.boards = {};
+      }
       if (s.type === 'draw') {
         const st = s.state;
         const wasDrawer = GAMES.draw.drawerPlayer(s) === idx;
@@ -365,6 +447,32 @@ function attachGames(io, hub) {
     });
 
     // traços do desenho vão direto para os outros (rápido) e ficam guardados para quem entrar depois
+    // ---- Tetris: tabuleiros ao vivo e ataques de lixo ----
+    socket.on('tetris:board', ({ groupId, b } = {}) => {
+      const s = sessions.get(Number(groupId));
+      if (!s || s.type !== 'tetris') return;
+      const idx = s.players.indexOf(userId);
+      if (idx < 0 || !s.state.playing[idx] || typeof b?.g !== 'string' || b.g.length > 400) return;
+      const snap = { g: b.g, inc: Math.max(0, Math.min(99, Number(b.inc) || 0)), l: Math.max(0, Number(b.l) || 0), skin: String(b.skin || 'classic').slice(0, 16), round: s.state.round };
+      s.boards[idx] = snap;
+      s.lines[idx] = Math.max(s.lines[idx] || 0, snap.l);
+      socket.to(`group:${s.groupId}`).emit('tetris:board', { groupId: s.groupId, idx, b: snap });
+    });
+
+    socket.on('tetris:attack', ({ groupId, lines } = {}) => {
+      const s = sessions.get(Number(groupId));
+      if (!s || s.type !== 'tetris' || s.state.phase !== 'playing') return;
+      const idx = s.players.indexOf(userId);
+      const n = Math.max(0, Math.min(20, Math.floor(Number(lines) || 0)));
+      if (idx < 0 || !s.state.alive[idx] || !n) return;
+      // alvo: alguém vivo aleatório (diferente de quem atacou)
+      const targets = s.state.alive.map((a, i) => (a && i !== idx ? i : -1)).filter((i) => i >= 0);
+      if (!targets.length) return;
+      const target = targets[Math.floor(Math.random() * targets.length)];
+      for (const sock of hub.online.get(s.players[target]) || []) sock.emit('tetris:garbage', { groupId: s.groupId, lines: n, from: idx });
+      io.to(`group:${s.groupId}`).emit('tetris:attackfx', { groupId: s.groupId, from: idx, to: target, lines: n });
+    });
+
     socket.on('game:stroke', ({ groupId, stroke } = {}) => {
       const s = sessions.get(Number(groupId));
       if (!s || s.type !== 'draw' || s.state.phase !== 'drawing') return;

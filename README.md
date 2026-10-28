@@ -62,6 +62,11 @@ Outras variáveis: `PORT` (padrão 3000), `DATA_DIR` (onde ficam banco e uploads
 
 ### Jogos
 - Aba **🎮 Jogos** ao lado do chat, com minijogos multiplayer que rodam no próprio site: **Desenha & Adivinha** (estilo Gartic), **Reflexo**, **Lig 4** e **Jogo da velha**. O grupo inteiro recebe o convite e dá pra jogar durante a call.
+- **🧱 Tetris Royale** (estilo TETR.IO), de 1v1 até 16 pessoas:
+  - **Jogo:** rotação SRS com wall kicks, hold, 5 próximas peças, peça fantasma, hard drop, T-spins, combos, back-to-back e perfect clear mandando **lixo** para os outros.
+  - **Tela:** mostra quantos tabuleiros couberem, e quem é eliminado sai da tela.
+  - **Progresso:** **15 estilos de torre** liberados por XP (linhas limpas + colocação).
+  - **Controles:** DAS/ARR ajustáveis, **modo casual** (velocidade fixa, mais tempo pra encaixar e toque no tabuleiro para derrubar a peça) e botões na tela no celular.
 - Catálogo de **jogos grátis** pra jogar com a galera (navegador, Steam, Epic, Riot).
 
 ### 🕹️ Modo Jogo Coop (jogar no PC de quem transmite)
@@ -115,6 +120,7 @@ server/
   auth.js     senhas (scrypt) e sessões
   routes.js   API REST: contas, perfil, grupos, mensagens, uploads, figurinhas
   games.js    minijogos multiplayer (o servidor é o juiz)
+  tetris-skins.js  estilos de torre do Tetris e o XP de cada um
   hub.js      tempo real: presença, chat e sinalização WebRTC
 public/
   js/main.js          login, grupos e navegação
@@ -123,6 +129,7 @@ public/
   js/settings-ui.js   configurações e edição de perfil
   js/profile.js       cartão de perfil
   js/games.js         aba Jogos (minijogos + catálogo)
+  js/tetris.js        Tetris Royale: motor, estilos e interface
   js/call/            chamada: rtc (conexões), media (mic/câmera/telas), audio (volumes),
                       stage (blocos redimensionáveis), call (controles e menus),
                       coop (Modo Jogo Coop), sounds (soundboard)

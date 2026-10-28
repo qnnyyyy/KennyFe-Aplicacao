@@ -74,6 +74,7 @@ async function main() {
     res.setHeader('Content-Disposition', 'attachment; filename="Kenfeh-Coop.bat"');
     res.type('application/octet-stream').send(bat);
   });
+  app.get('/js/tetris-skins.js', (_req, res) => res.type('application/javascript').send(`export const TETRIS_SKINS = ${JSON.stringify(require('./tetris-skins').TETRIS_SKINS)};`));
   app.get('/vendor/gifenc.js', (_req, res) => res.sendFile(require.resolve('gifenc/dist/gifenc.esm.js')));
   app.use(express.static(path.join(__dirname, '..', 'public'), { extensions: ['html'] }));
   app.get('*', (_req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'index.html')));
