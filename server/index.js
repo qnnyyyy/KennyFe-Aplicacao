@@ -66,7 +66,8 @@ async function main() {
   });
 
   const server = USE_HTTPS ? https.createServer(await loadCertificate(), app) : http.createServer(app);
-  const io = new Server(server, { maxHttpBufferSize: 1e6 });
+  // pingTimeout maior: celular com o app em segundo plano congela a página por alguns segundos
+  const io = new Server(server, { maxHttpBufferSize: 1e6, pingInterval: 25000, pingTimeout: 60000 });
   const hub = createHub(io);
   const games = attachGames(io, hub);
   const { COMMANDS } = require('./commands').attachCommands(io, hub, { createGame: games.createGame });

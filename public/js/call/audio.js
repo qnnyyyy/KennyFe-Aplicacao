@@ -2,7 +2,7 @@
 // silenciar localmente, ensurdecer, escolher o alto-falante e detectar quem fala.
 // Modo anti-eco (padrão no celular): a voz toca direto num <audio>, porque o cancelamento
 // de eco do celular não "enxerga" o som que passa pelo Web Audio e a outra pessoa ouve eco.
-import { store, save } from '../ui.js';
+import { store, save, bgInterval, clearBgInterval } from '../ui.js';
 
 export class AudioOut {
   constructor({ onSpeaking, elementMode = false }) {
@@ -19,11 +19,14 @@ export class AudioOut {
     this.deafened = false;
     this.speaking = new Map(); // peerId -> bool
     this.buf = new Float32Array(1024);
-    this.loop = setInterval(() => this.tick(), 50);
+    this.loop = bgInterval(() => this.tick(), 50);
+    // o navegador pode suspender o áudio (celular em segundo plano, aba sem foco): volta sozinho
+    this.ctx.addEventListener('statechange', () => this.ctx.state !== 'running' && this.ctx.state !== 'closed' && this.resume());
   }
 
   resume() {
-    if (this.ctx.state !== 'running') this.ctx.resume().catch(() => {});
+    if (this.ctx.state !== 'running' && this.ctx.state !== 'closed') this.ctx.resume().catch(() => {});
+    if (this.elementMode) for (const e of this.tracks.values()) if (e.el.paused) e.el.play().catch(() => {});
   }
 
   async setOutputDevice(deviceId) {
@@ -163,7 +166,7 @@ export class AudioOut {
   }
 
   destroy() {
-    clearInterval(this.loop);
+    clearBgInterval(this.loop);
     for (const id of [...this.tracks.keys()]) this.detach(id);
     this.ctx.close().catch(() => {});
   }

@@ -366,3 +366,33 @@ export function sfx(kind) {
     });
   } catch {}
 }
+
+// ---------- Relógio que não "dorme" em segundo plano ----------
+// Abas em segundo plano têm setInterval desacelerado para 1×/s (ou 1×/min). Timers dentro
+// de um Worker não sofrem isso, então o gate do microfone, a detecção de voz e o bot de
+// música continuam no ritmo certo com o Kenfeh em outra aba.
+let bgWorker = null;
+const bgFns = new Map();
+let bgSeq = 0;
+export function bgInterval(fn, ms) {
+  const id = ++bgSeq;
+  bgFns.set(id, fn);
+  try {
+    if (!bgWorker) {
+      const src = 'const t={};onmessage=(e)=>{const d=e.data;if(d.ms)t[d.id]=setInterval(()=>postMessage(d.id),d.ms);else{clearInterval(t[d.id]);delete t[d.id];}}';
+      bgWorker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+      bgWorker.onmessage = (e) => bgFns.get(e.data)?.();
+    }
+    bgWorker.postMessage({ id, ms });
+  } catch {
+    const t = setInterval(fn, ms); // sem Worker: cai no timer normal
+    bgFns.set(id, () => {});
+    return { fallback: t };
+  }
+  return id;
+}
+export function clearBgInterval(id) {
+  if (id && typeof id === 'object') return clearInterval(id.fallback);
+  bgFns.delete(id);
+  bgWorker?.postMessage({ id, ms: 0 });
+}

@@ -2,6 +2,7 @@
 // Cada fonte de áudio vira uma "faixa" separada que pode ser ligada/desligada
 // e ter volume próprio antes de ir pra call (mixer de transmissão).
 import { settings, micConstraints, cameraConstraints, CAMERA_PRESETS, SCREEN_RESOLUTIONS } from './settings.js';
+import { bgInterval, clearBgInterval } from '../ui.js';
 
 const SURFACE_LABEL = { monitor: 'tela inteira', window: 'janela', browser: 'aba do navegador' };
 
@@ -33,7 +34,7 @@ export class LocalMedia {
     this.muted = false;
     this.screenCounter = 0;
     this.speaking = false;
-    this.loop = setInterval(() => this.tick(), 40);
+    this.loop = bgInterval(() => this.tick(), 40); // continua no ritmo com a aba em segundo plano
     this.buf = new Float32Array(1024);
   }
 
@@ -362,7 +363,7 @@ export class LocalMedia {
   }
 
   destroy() {
-    clearInterval(this.loop);
+    clearBgInterval(this.loop);
     for (const id of [...this.screens.keys()]) this.stopScreen(id);
     this.stopCamera();
     for (const id of [...this.sources.keys()]) this.removeSource(id);

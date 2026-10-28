@@ -81,6 +81,14 @@ export class CallController {
       if (this.lostConnection && this.active) this.rejoin();
       this.lostConnection = false;
     });
+    // voltou para a aba / o celular voltou para o app: acorda áudio, conexão e tela
+    const wake = () => this.wakeUp();
+    document.addEventListener('visibilitychange', () => (document.hidden ? this.onHidden() : wake()));
+    window.addEventListener('pageshow', wake);
+    window.addEventListener('focus', wake);
+    window.addEventListener('online', wake);
+    document.addEventListener('resume', wake);
+    document.addEventListener('pointerdown', () => this.active && this.resumeAudio(), { passive: true });
 
     onSettings((st, patch) => this.onSettingsChanged(st, patch));
     this.setupIdle();
@@ -160,6 +168,8 @@ export class CallController {
     this.app.music?.onCallChanged();
     this.renderControls();
     this.refreshTiles();
+    this.setupMediaSession();
+    this.wakeUp();
     return res;
   }
 
@@ -201,6 +211,62 @@ export class CallController {
     if (sound && settings().joinSounds) sfx('leave');
     this.app.music?.onCallChanged();
     this.app.onCallChanged();
+    this.onHidden();
+    this.setupMediaSession();
+  }
+
+  resumeAudio() {
+    this.audioOut?.resume();
+    if (this.media?.ctx && this.media.ctx.state !== 'running' && this.media.ctx.state !== 'closed') this.media.ctx.resume().catch(() => {});
+  }
+
+  onHidden() {
+    this.wakeLock?.release?.().catch(() => {});
+    this.wakeLock = null;
+  }
+
+  async wakeUp() {
+    if (!this.active) return;
+    this.resumeAudio();
+    if (!this.socket.connected) this.socket.connect();
+    // conexões que caíram enquanto a aba dormia: renegocia
+    for (const [peerId, r] of this.remotes) {
+      const pc = this.pm?.peers?.get?.(peerId)?.pc;
+      if (pc && (pc.connectionState === 'failed' || pc.connectionState === 'disconnected' || pc.iceConnectionState === 'disconnected')) {
+        try {
+          pc.restartIce();
+        } catch {}
+      }
+      r.lastWake = Date.now();
+    }
+    this.refreshTiles();
+    // celular: tela não apaga sozinha durante a call
+    if (!document.hidden && !this.wakeLock && navigator.wakeLock) {
+      try {
+        this.wakeLock = await navigator.wakeLock.request('screen');
+        this.wakeLock.addEventListener('release', () => (this.wakeLock = null));
+      } catch {}
+    }
+  }
+
+  // controles da call na notificação / tela de bloqueio (Android/Chrome)
+  setupMediaSession() {
+    const ms = navigator.mediaSession;
+    if (!ms) return;
+    try {
+      const g = this.app.group(this.groupId);
+      const ch = this.app.channel(this.channelId);
+      ms.metadata = this.active ? new MediaMetadata({ title: g?.isDm ? `Call com ${this.app.groupTitle(g)}` : `${ch?.name || 'Call'} • ${g?.name || ''}`, artist: 'Kenfeh', artwork: [{ src: '/img/logo.svg', sizes: '512x512', type: 'image/svg+xml' }] }) : null;
+      ms.playbackState = this.active ? 'playing' : 'none';
+      const set = (a, fn) => {
+        try {
+          ms.setActionHandler(a, this.active ? fn : null);
+        } catch {}
+      };
+      set('hangup', () => this.leave());
+      set('togglemicrophone', () => this.toggleMute());
+      ms.setMicrophoneActive?.(this.active && !this.muted && !this.deafened);
+    } catch {}
   }
 
   dropPeer(peerId, refresh = true) {
@@ -381,6 +447,9 @@ export class CallController {
 
   afterSelfState() {
     if (this.active) this.socket.emit('call:state', { state: this.localState() });
+    try {
+      navigator.mediaSession?.setMicrophoneActive?.(this.active && !this.muted && !this.deafened);
+    } catch {}
     this.app.renderMeBar();
     this.renderControls();
     this.refreshTiles();

@@ -145,6 +145,16 @@ function start(user) {
   socket.on('connect_error', (err) => {
     if (err.message === 'unauthorized') location.reload();
   });
+  // voltou de uma queda (aba dormindo, celular em segundo plano, internet): busca o que perdeu
+  let connectedOnce = false;
+  socket.on('connect', () => {
+    if (connectedOnce && app.chat.groupId && app.chat.channelId) app.chat.open(app.chat.groupId, app.chat.channelId);
+    connectedOnce = true;
+  });
+  const wake = () => !socket.connected && socket.connect();
+  document.addEventListener('visibilitychange', () => !document.hidden && wake());
+  window.addEventListener('online', wake);
+  window.addEventListener('pageshow', wake);
   socket.on('groups:update', ({ groups }) => {
     app.groups = new Map(groups.map((g) => [g.id, g]));
     const me = groups.flatMap((g) => g.members).find((m) => m.id === app.me.id);

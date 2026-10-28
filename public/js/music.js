@@ -1,6 +1,6 @@
 // KenBeat 🎧 no navegador: toca o player do YouTube no mesmo ponto para todo mundo da call
 // e mostra o bloco do bot no palco (capa, barra de progresso, fila e controles).
-import { el, icon, toast, store, save } from './ui.js';
+import { el, icon, toast, store, save, bgInterval } from './ui.js';
 import { can } from './guild.js';
 
 const fmt = (s) => {
@@ -51,7 +51,7 @@ export class MusicClient {
       }
       if (!this.app.currentGroupId) this.app.renderAll?.();
     });
-    setInterval(() => this.tick(), 1000);
+    bgInterval(() => this.tick(), 1000);
   }
 
   stateOf(channelId) {
