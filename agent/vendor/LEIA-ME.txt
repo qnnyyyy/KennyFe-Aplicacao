@@ -4,6 +4,6 @@ Componentes de terceiros embutidos no KenfehCoop.exe
   https://github.com/nefarius/ViGEmBus — licença BSD-3-Clause.
   Origem: https://github.com/nefarius/ViGEmBus/releases/download/v1.22.0/ViGEmBus_1.22.0_x64_x86_arm64.exe
 
-- Nefarius.ViGEm.Client.dll — biblioteca cliente (1.21.256), de
+- Nefarius.ViGEm.Client.dll — biblioteca cliente (1.17.178, versão .NET Framework 4.5+), de
   https://github.com/nefarius/ViGEm.NET — licença MIT.
-  Origem: pacote NuGet Nefarius.ViGEm.Client 1.21.256 (lib/netstandard2.0)
+  Origem: pacote NuGet Nefarius.ViGEm.Client 1.17.178 (lib/net452)

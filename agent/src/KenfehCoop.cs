@@ -29,11 +29,57 @@ namespace KenfehCoop
 {
     static class Program
     {
+        static Mutex single;
+
         [STAThread]
         static void Main(string[] args)
         {
-            ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072; // TLS 1.2
             bool console = Array.IndexOf(args, "--console") >= 0;
+            // qualquer erro aparece na tela e vai para %LOCALAPPDATA%\Kenfeh\erro.txt (antes fechava sem avisar)
+            AppDomain.CurrentDomain.UnhandledException += (s, e) => Crash(e.ExceptionObject as Exception, console);
+            if (!console)
+            {
+                Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+                Application.ThreadException += (s, e) => Crash(e.Exception, false);
+            }
+            try { Start(args, console); }
+            catch (Exception e) { Crash(e, console); }
+        }
+
+        static void Crash(Exception e, bool console)
+        {
+            string text = "Kenfeh Coop " + Agent.Version + " — " + DateTime.Now + "\r\n" + Environment.OSVersion + " / .NET " + Environment.Version + "\r\n\r\n" + e;
+            string file = Path.Combine(Path.GetTempPath(), "KenfehCoop-erro.txt");
+            try
+            {
+                Directory.CreateDirectory(Agent.DataDir);
+                file = Path.Combine(Agent.DataDir, "erro.txt");
+            }
+            catch { }
+            try { File.WriteAllText(file, text); } catch { }
+            if (console) { Console.WriteLine(text); return; }
+            try
+            {
+                MessageBox.Show("O Kenfeh Coop encontrou um erro e não conseguiu abrir:\n\n" + (e == null ? "?" : e.GetType().Name + ": " + e.Message) +
+                    "\n\nOs detalhes foram salvos em:\n" + file + "\n\nMande esse arquivo para quem cuida do Kenfeh.", "Kenfeh Coop — erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            catch { }
+        }
+
+        static void Start(string[] args, bool console)
+        {
+            try { ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072; } catch { } // TLS 1.2
+            if (!console)
+            {
+                // só uma cópia aberta (a segunda só avisa)
+                bool first;
+                single = new Mutex(true, "KenfehCoop-unico", out first);
+                if (!first)
+                {
+                    MessageBox.Show("O Kenfeh Coop já está aberto — procure o ícone dele na barra de tarefas.", "Kenfeh Coop", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+            }
             string extra = "";
             foreach (string a in args) if (a.StartsWith("http")) extra += a + ",";
             Agent.Init(extra);
@@ -91,8 +137,8 @@ namespace KenfehCoop
             if (File.Exists(originsFile)) foreach (string s in File.ReadAllLines(originsFile)) if (s.Trim() != "") o.Add(s.Trim());
             AllowedOrigins = o.ToArray();
             InitKeys();
-            InitGames();
-            InitVigem();
+            try { InitGames(); } catch (Exception e) { AddLog("Detector de jogo desligado: " + e.Message); }
+            try { InitVigem(); } catch (Exception e) { VigemError = e.Message; }
         }
 
         public static void NewCode()
@@ -227,7 +273,8 @@ namespace KenfehCoop
         public static bool BusMissing { get { return VClient == null && VigemError.Contains("ViGEmBus"); } }
         public static bool VigemDllMissing;
         static readonly string[] BtnNames = { "A", "B", "X", "Y", "LeftShoulder", "RightShoulder", "", "", "Back", "Start", "LeftThumb", "RightThumb", "Up", "Down", "Left", "Right", "Guide" };
-        static string VigemDll { get { return Path.Combine(DataDir, "Nefarius.ViGEm.Client.dll"); } }
+        // versão para .NET Framework 4.5+ (a "netstandard" não abria em alguns Windows)
+        static string VigemDll { get { return Path.Combine(DataDir, "Nefarius.ViGEm.Client-net45.dll"); } }
 
         static object StaticMember(Type t, string name)
         {
@@ -281,7 +328,7 @@ namespace KenfehCoop
             {
                 AddLog("Baixando a biblioteca do controle virtual…");
                 string pkg = Path.Combine(DataDir, "vigem.zip");
-                using (WebClient wc = new WebClient()) wc.DownloadFile("https://www.nuget.org/api/v2/package/Nefarius.ViGEm.Client/1.21.256", pkg);
+                using (WebClient wc = new WebClient()) wc.DownloadFile("https://www.nuget.org/api/v2/package/Nefarius.ViGEm.Client/1.17.178", pkg);
                 using (System.IO.Compression.ZipArchive z = System.IO.Compression.ZipFile.OpenRead(pkg))
                 {
                     System.IO.Compression.ZipArchiveEntry best = null;
