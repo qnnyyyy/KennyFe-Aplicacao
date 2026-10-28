@@ -95,6 +95,8 @@ addUserCol('activity', 'TEXT'); // JSON { name, since, source }
 addUserCol('tetris_xp', 'INTEGER NOT NULL DEFAULT 0');
 addUserCol('tetris_skin', "TEXT NOT NULL DEFAULT 'classic'");
 addUserCol('email', 'TEXT');
+addUserCol('deco', "TEXT NOT NULL DEFAULT 'none'"); // decoração que passa da foto
+addUserCol('effect', "TEXT NOT NULL DEFAULT 'none'"); // efeito animado no cartão de perfil
 addUserCol('last_seen', 'INTEGER');
 db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email COLLATE NOCASE) WHERE email IS NOT NULL");
 

@@ -6,7 +6,7 @@ import { api } from './api.js';
 import { settings, updateSettings, CAMERA_PRESETS, SCREEN_RESOLUTIONS } from './call/settings.js';
 import { listDevices, cleanLabel } from './call/media.js';
 import { keyLabel } from './call/sounds.js';
-import { AVATARS, BANNERS, COS_CATS } from './cosmetics.js';
+import { AVATARS, BANNERS, DECOS, EFFECTS, COS_CATS } from './cosmetics.js';
 import { cropImage } from './cropper.js';
 
 const PROFILE_COLORS = ['#ff4fa3', '#f72585', '#ff6b6b', '#ffb84c', '#5ce1a0', '#38d6ff', '#3d8bff', '#7b5cff'];
@@ -55,6 +55,8 @@ function accountPane(app) {
     bannerColor: me.bannerColor || '#2f7bff',
     bannerUrl: me.bannerUrl,
     frame: me.frame || 'none',
+    deco: me.deco || 'none',
+    effect: me.effect || 'none',
     favoriteGames: [...(me.favoriteGames || [])],
     showActivity: me.showActivity !== false,
   };
@@ -124,6 +126,12 @@ function accountPane(app) {
   const bannersG = gallery(BANNERS, (b) => el('button', { class: `cos-opt ${draft.bannerUrl === 'theme:' + b.id ? 'active' : ''}`, title: b.name, onclick: () => { draft.bannerUrl = 'theme:' + b.id; bannersG.paint(); renderPreview(); } },
     el('div', { class: `bnr-prev bnr bnr-${b.id}` }), el('small', {}, b.name)));
   bannersG.grid.classList.add('wide');
+  // Decorações que passam da foto e efeitos no cartão
+  const decosG = gallery(DECOS, (d) => el('button', { class: `cos-opt deco-opt ${draft.deco === d.id ? 'active' : ''}`, title: d.name, onclick: () => { draft.deco = d.id; decosG.paint(); renderPreview(); } },
+    avatar({ ...current(), frame: draft.frame, deco: d.id }, 46), el('small', {}, d.name)));
+  const effectsG = gallery(EFFECTS, (x) => el('button', { class: `cos-opt ${draft.effect === x.id ? 'active' : ''}`, title: x.name, onclick: () => { draft.effect = x.id; effectsG.paint(); renderPreview(); } },
+    el('div', { class: 'fx-prev' }, x.id !== 'none' ? el('img', { src: `/img/fx/${x.id}.svg`, alt: '' }) : '—'), el('small', {}, x.name)));
+  effectsG.grid.classList.add('wide');
 
   // Jogos favoritos
   const chips = el('div', { class: 'chips' });
@@ -198,6 +206,8 @@ function accountPane(app) {
           el('div', { class: 'field' }, el('span', {}, '🧑‍🎤 Avatares prontos (ou envie sua foto em "Trocar foto")'), avatarsG.node),
           el('div', { class: 'field' }, el('span', {}, '🌌 Fundo do perfil animado (ou envie uma imagem em "Imagem do banner")'), bannersG.node),
           el('div', { class: 'field' }, el('span', {}, '💫 Moldura em volta da foto'), frames),
+          el('div', { class: 'field' }, el('span', {}, '🐦‍⬛ Decoração especial (passa do limite da foto — combina com a moldura)'), decosG.node),
+          el('div', { class: 'field' }, el('span', {}, '✨ Efeito no cartão de perfil (anima por cima de tudo)'), effectsG.node),
           el('div', { class: 'field' }, el('span', {}, 'Jogos favoritos (até 12)'), gameInput, datalist, chips),
           el('h4', {}, '🎮 Jogando agora'),
           sw('Mostrar o que estou jogando', 'Aparece no seu perfil e na lista de membros. O agente do PC detecta sozinho (veja "Jogo Coop"), ou você escreve abaixo.', draft.showActivity, (v) => { draft.showActivity = v; renderPreview(); }),

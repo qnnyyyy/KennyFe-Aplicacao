@@ -15,6 +15,7 @@ export function profileCard(app, user, { preview = false } = {}) {
   const act = user.activity && online;
   return el('div', { class: 'profile-card' },
     banner,
+    user.effect && user.effect !== 'none' ? el('img', { class: 'pc-fx', src: `/img/fx/${user.effect}.svg`, alt: '' }) : null,
     el('div', { class: 'pc-head' },
       el('div', { class: 'pc-av' }, avatar(user, 88), el('span', { class: `pc-presence ${online ? 'on' : ''}` })),
     ),

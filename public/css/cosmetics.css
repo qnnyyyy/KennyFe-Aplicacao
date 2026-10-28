@@ -253,3 +253,15 @@
 .crop-canvas { display: block; cursor: grab; touch-action: none; }
 .crop-canvas:active { cursor: grabbing; }
 .crop-zoom-row { display: flex; align-items: center; gap: 10px; width: min(360px, 100%); color: var(--text-2); font-weight: 800; }
+/* decoração que passa do limite da foto */
+.av-deco { position: absolute; left: -30%; top: -30%; width: 160%; height: 160%; pointer-events: none; z-index: 3; max-width: none; user-select: none; }
+.av:has(.av-deco) { overflow: visible; isolation: isolate; }
+.av-deco.back { z-index: -1; }
+.deco-opt { padding-top: 16px; padding-bottom: 8px; }
+.deco-opt .av { margin: 4px 0; }
+/* efeito por cima do cartão de perfil */
+.profile-card { overflow: hidden; }
+.pc-fx { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; z-index: 4; }
+.fx-prev { width: 100%; height: 56px; border-radius: 8px; overflow: hidden; display: grid; place-items: center; color: var(--text-3); background: linear-gradient(135deg, #1a1446, #3a0a4e); }
+.fx-prev img { width: 100%; height: 100%; object-fit: cover; }
+@media (prefers-reduced-motion: reduce) { .pc-fx { display: none; } }

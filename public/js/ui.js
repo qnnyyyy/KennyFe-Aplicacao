@@ -113,11 +113,19 @@ export function avatar(user, size = 36, { frame = true } = {}) {
   else inner.textContent = (user?.displayName || user?.username || '?').trim().charAt(0).toUpperCase();
   const f = frame && user?.frame && user.frame !== 'none' ? user.frame : null;
   const wrap = el('div', { class: `av ${f ? 'framed frame-' + f : ''}`, style: { width: size + 'px', height: size + 'px' } }, inner);
+  // decoração que passa do limite da foto (corvos, asas, chamas…); só em tamanhos onde aparece bem
+  const deco = frame && size >= 28 && user?.deco && user.deco !== 'none' ? DECO_BY_ID[user.deco] : null;
+  if (deco) {
+    // camada de trás fica atrás da foto (o dragão/aura passa por trás), a da frente por cima
+    if (deco.layers.includes('b')) wrap.prepend(el('img', { class: 'av-deco back', src: `/img/deco/${deco.id}${deco.layers === 'b' ? '' : '-back'}.svg`, alt: '', draggable: 'false' }));
+    if (deco.layers.includes('f')) wrap.append(el('img', { class: 'av-deco', src: `/img/deco/${deco.id}.svg`, alt: '', draggable: 'false' }));
+  }
   wrap.style.setProperty('--fw', Math.max(2, Math.round(size * 0.075)) + 'px');
   return wrap;
 }
 
 export { FRAMES } from './cosmetics.js';
+import { DECO_BY_ID } from './cosmetics.js';
 
 export function timeAgo(sec) {
   const d = Math.max(0, Math.floor(Date.now() / 1000 - sec));

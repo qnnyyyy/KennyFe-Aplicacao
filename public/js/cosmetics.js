@@ -32,6 +32,24 @@ export const FRAMES = [
   ['shadow', 'Sombra', 'anime'], ['bats', 'Morcegos', 'geek'], ['flames', 'Chamas', 'jogos'], ['stars8', 'Estrelas 8-bit', 'jogos'], ['kawaii', 'Kawaii', 'geek'],
 ].map(([id, name, cat]) => [id, name, cat]);
 
+// layers: 'f' = só na frente da foto, 'b' = só atrás, 'fb' = frente + atrás (<id>-back.svg)
+export const DECOS = [
+  ['none', 'Nenhuma', 'basico', 'f'],
+  ['x-dragon', 'Dragão sombrio', 'jogos', 'fb'], ['x-dragon-fly', 'Dragão dando a volta', 'jogos', 'fb'], ['x-dragon-east', 'Dragão oriental', 'anime', 'f'],
+  ['x-aura-water', 'Aura de água', 'anime', 'fb'], ['x-aura-fire', 'Aura de fogo', 'anime', 'fb'], ['x-aura-chakra', 'Aura de chakra', 'anime', 'fb'],
+  ['x-aura-sharingan', 'Aura sharingan', 'anime', 'fb'], ['x-aura-golden', 'Aura dourada', 'anime', 'fb'], ['x-aura-nature', 'Aura da natureza', 'anime', 'fb'],
+  ['x-crows', 'Bando de corvos', 'anime', 'fb'], ['x-fox9', 'Raposa de nove caudas', 'anime', 'fb'], ['x-serpent', 'Serpente sombria', 'anime', 'fb'],
+  ['x-ninja', 'Kunais ninja', 'anime', 'f'], ['x-sakura', 'Galho de sakura', 'anime', 'f'],
+  ['x-crown', 'Coroa', 'jogos', 'f'], ['x-angel', 'Asas de anjo', 'geek', 'b'], ['x-demon', 'Chifres e asas', 'geek', 'b'],
+].map(([id, name, cat, layers]) => ({ id, name, cat, layers }));
+export const DECO_BY_ID = Object.fromEntries(DECOS.map((d) => [d.id, d]));
+
+export const EFFECTS = [
+  ['none', 'Nenhum', 'basico'], ['crows', 'Corvos atravessando', 'anime'], ['sakura', 'Chuva de sakura', 'anime'], ['leaves', 'Folhas ao vento', 'anime'],
+  ['lightning', 'Tempestade', 'anime'], ['embers', 'Brasas', 'jogos'], ['pixels', 'Pixels', 'jogos'], ['stars', 'Estrelas', 'geek'],
+  ['snow', 'Neve', 'geek'], ['hearts', 'Corações', 'geek'], ['bubbles', 'Bolhas', 'geek'], ['bats', 'Morcegos', 'geek'],
+].map(([id, name, cat]) => ({ id, name, cat }));
+
 export const COS_CATS = [['all', 'Todos'], ['anime', '🍥 Anime'], ['jogos', '🎮 Jogos'], ['geek', '🤓 Geek'], ['basico', '✨ Clássicos']];
 
 // fundo do perfil: imagem enviada, tema animado ("theme:<id>") ou cor

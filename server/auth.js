@@ -20,7 +20,7 @@ function verifyPassword(password, stored) {
   return crypto.timingSafeEqual(expected, actual);
 }
 
-const { FRAMES } = require('./cosmetics');
+const { FRAMES, DECOS, EFFECTS } = require('./cosmetics');
 
 function parseJson(s, fallback) {
   try {
@@ -44,6 +44,8 @@ function publicUser(u) {
     bannerColor: u.banner_color || '#2f7bff',
     bannerUrl: u.banner_url || null,
     frame: FRAMES.includes(u.frame) ? u.frame : 'none',
+    deco: DECOS.includes(u.deco) ? u.deco : 'none',
+    effect: EFFECTS.includes(u.effect) ? u.effect : 'none',
     favoriteGames: parseJson(u.favorite_games, []),
     showActivity,
     // o "jogando agora" só sai se a pessoa permitir
