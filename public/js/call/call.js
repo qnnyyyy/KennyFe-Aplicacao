@@ -23,7 +23,7 @@ export class CallController {
     this.muted = false;
     this.deafened = false;
     this.wrap = $('#stage-wrap');
-    this.stage = new Stage($('#stage'), { onContext: (t, x, y) => this.tileMenu(t, x, y), onCoop: (t) => this.coop.request(t.info.peerId, t.info.screenId) });
+    this.stage = new Stage($('#stage'), { onContext: (t, x, y) => this.tileMenu(t, x, y), onCoop: (t) => this.coop.request(t.info.peerId, t.info.screenId), onWrapFullscreen: () => this.toggleFullscreen() });
     this.coop = new CoopController(this);
     this.recorders = new Map();
     this.soundCache = new Map();
@@ -166,8 +166,10 @@ export class CallController {
     this.pingTimer = setInterval(() => this.updatePings(), 3000);
     this.app.onCallChanged();
     this.app.music?.onCallChanged();
+    this.app.watch?.onCallChanged();
     this.renderControls();
     this.refreshTiles();
+    if (this.app.watch?.mine()) this.enterWatchLayout();
     this.setupMediaSession();
     this.wakeUp();
     return res;
@@ -210,6 +212,7 @@ export class CallController {
     this.serverMuted = false;
     if (sound && settings().joinSounds) sfx('leave');
     this.app.music?.onCallChanged();
+    this.app.watch?.onCallChanged();
     this.app.onCallChanged();
     this.onHidden();
     this.setupMediaSession();
@@ -337,6 +340,7 @@ export class CallController {
 
   onSpeaking(peerId, sp) {
     this.stage.setSpeaking(peerId, sp);
+    this.app.watch?.onSpeaking(peerId, sp);
     const userId = peerId === 'local' ? this.app.me.id : this.remotes.get(peerId)?.userId;
     if (userId) document.querySelectorAll(`[data-voice-user="${userId}"]`).forEach((n) => n.classList.toggle('speaking', sp));
   }
@@ -379,6 +383,9 @@ export class CallController {
     // bloco do KenBeat (bot de música) quando está tocando nesta call
     const mt = this.app.music?.tileInfo();
     if (mt) want.set('bot:music', mt);
+    // sessão de assistir junto (o player fica por cima deste bloco)
+    const wt = this.app.watch?.tileInfo();
+    if (wt) want.set('watch', wt);
     for (const key of [...this.stage.tiles.keys()]) if (!want.has(key)) this.stage.remove(key);
     for (const [key, info] of want) this.stage.upsert(key, info);
     // tile que o convidado está controlando no Modo Coop
@@ -479,6 +486,46 @@ export class CallController {
     if (document.body.classList.toggle('cinema', force)) this.socket.emit('track', { feature: 'cinema' });
     this.renderControls();
     this.stage.scheduleRender();
+  }
+
+  // layout Assistir: vídeo/tela grande e os rostos em bolhas (ou na lateral)
+  enterWatchLayout() {
+    if (this.stage.layout === 'watch') return;
+    this.prevLayout = this.stage.layout;
+    this.stage.setLayout('watch');
+    this.socket.emit('track', { feature: 'watch_layout' });
+    this.renderControls();
+  }
+
+  leaveWatchLayout() {
+    if (this.stage.layout !== 'watch' || this.stage.hasWatchContent()) return;
+    this.stage.setLayout(this.prevLayout && this.prevLayout !== 'watch' ? this.prevLayout : 'row');
+    this.renderControls();
+  }
+
+  facesPopover(anchor) {
+    const st = this.stage;
+    const opt = (on, label, fn, ic = null) => el('button', { class: `ctx-item ${on ? 'checked' : ''}`, onclick: () => { fn(); closeMenu(); this.renderControls(); this.app.watch?.paintUI(true); } }, ic ? icon(ic, 16) : el('span', { class: 'ic-space' }), el('span', { class: 'ctx-label' }, label), el('span', { class: 'ctx-check' }, on ? '✓' : ''));
+    const watching = st.layout === 'watch';
+    const pos = (id, label) => opt(watching && st.faces === 'bubbles' && st.facesPos === id, label, () => { this.enterWatchLayout(); st.setFacesPos(id); });
+    popover(anchor, el('div', {},
+      el('div', { class: 'ctx-title' }, '👥 Rostos durante o filme'),
+      opt(watching && st.faces === 'bubbles', 'Bolhas por cima do vídeo', () => { this.enterWatchLayout(); st.setFaces('bubbles'); }, 'users'),
+      opt(watching && st.faces === 'side', 'Numa coluna do lado', () => { this.enterWatchLayout(); st.setFaces('side'); }, 'columns'),
+      opt(watching && st.faces === 'hidden', 'Esconder (só o vídeo)', () => { this.enterWatchLayout(); st.setFaces('hidden'); }, 'eye-off'),
+      el('div', { class: 'ctx-title' }, 'Onde ficam as bolhas'),
+      pos('br', 'Canto de baixo, à direita'),
+      pos('bl', 'Canto de baixo, à esquerda'),
+      pos('tr', 'Canto de cima, à direita'),
+      pos('tl', 'Canto de cima, à esquerda'),
+      pos('right', 'Na lateral direita (em pé)'),
+      el('div', { class: 'ctx-sep' }),
+      opt(Boolean(this.media?.camera), this.media?.camera ? 'Minha câmera ligada' : 'Ligar minha câmera', () => this.toggleCamera(), 'video'),
+      opt(settings().showSelfPreview, 'Mostrar minha bolha', () => updateSettings({ showSelfPreview: !settings().showSelfPreview }), 'monitor'),
+      opt(settings().showNonVideo, 'Mostrar quem está sem câmera', () => updateSettings({ showNonVideo: !settings().showNonVideo })),
+      watching ? el('div', { class: 'ctx-sep' }) : null,
+      watching ? opt(false, 'Sair do layout Assistir', () => { this.stage.setLayout(this.prevLayout && this.prevLayout !== 'watch' ? this.prevLayout : 'row'); }, 'grid') : null
+    ));
   }
 
   toggleFullscreen() {
@@ -582,6 +629,8 @@ export class CallController {
         split(b(m.camera ? 'video' : 'video-off', 'Câmera', () => this.toggleCamera(), m.camera ? 'on' : ''), (a) => this.cameraPopover(a)),
         !navigator.mediaDevices?.getDisplayMedia ? null : el('button', { class: `cc-btn ${screens ? 'on' : ''}`, title: 'Compartilhar tela (pode ser mais de uma)', onclick: (e) => (screens ? this.screensPopover(e.currentTarget) : this.shareDialog()) },
           icon('monitor-up', 22), screens ? el('span', { class: 'cc-count' }, screens) : null),
+        el('button', { class: `cc-btn ${this.app.watch?.mine() ? 'on' : ''}`, title: this.app.watch?.mine() ? 'Sessão de assistir junto: fila e adicionar vídeos' : 'Assistir junto (YouTube, vídeo ou filme da tela)', onclick: (e) => (this.app.watch?.mine() ? this.app.watch.queuePopover(e.currentTarget) : this.app.watch?.openDialog()) }, el('span', { class: 'cc-emoji' }, '🍿')),
+        el('button', { class: 'cc-btn', title: 'Reagir (aparece pra todo mundo da call)', onclick: (e) => this.app.watch?.reactPopover(e.currentTarget) }, el('span', { class: 'cc-emoji' }, '😂')),
         b('sliders', 'Mixer: escolher quais áudios transmitir', () => this.openMixer()),
         IS_MOBILE ? null : el('button', { class: `cc-btn ${this.coop.hosting ? 'on' : ''}`, title: 'Modo Jogo Coop: deixar amigos jogarem no seu PC', onclick: () => this.coop.openHostDialog() }, el('span', { class: 'cc-emoji' }, '🕹️')),
         el('button', { class: 'cc-btn', title: 'Soundboard', onclick: (e) => this.soundboard(e.currentTarget) }, el('span', { class: 'cc-emoji' }, '📣'))
@@ -598,7 +647,7 @@ export class CallController {
   }
 
   layoutIcon() {
-    return { grid: 'grid', row: 'columns', column: 'rows', focus: 'focus' }[this.stage.layout] || 'grid';
+    return { grid: 'grid', row: 'columns', column: 'rows', focus: 'focus', watch: 'film' }[this.stage.layout] || 'grid';
   }
 
   layoutPopover(anchor) {
@@ -606,6 +655,8 @@ export class CallController {
     const st = settings();
     popover(anchor, el('div', {},
       el('div', { class: 'ctx-title' }, 'Layout'),
+      el('button', { class: `ctx-item ${this.stage.layout === 'watch' ? 'checked' : ''}`, onclick: () => { this.prevLayout = this.stage.layout === 'watch' ? this.prevLayout : this.stage.layout; this.stage.setLayout('watch'); closeMenu(); this.renderControls(); } }, icon('film', 16), el('span', { class: 'ctx-label' }, '🍿 Assistir: vídeo grande + rostos'), el('span', { class: 'ctx-check' }, this.stage.layout === 'watch' ? '✓' : '')),
+      this.stage.layout === 'watch' ? el('button', { class: 'ctx-item', onclick: (e) => this.facesPopover(anchor) }, el('span', { class: 'ic-space' }), el('span', { class: 'ctx-label' }, 'Rostos: bolhas, lateral ou escondidos…')) : null,
       opt('row', 'columns', 'Lado a lado (arraste as divisórias)'),
       opt('column', 'rows', 'Um em cima do outro'),
       opt('focus', 'focus', 'Foco: um grande + lateral'),
@@ -667,28 +718,37 @@ export class CallController {
   }
 
   // ---------- Diálogo de compartilhamento ----------
-  shareDialog() {
+  shareDialog(preset = null) {
     const st = settings();
     const n = this.media.screenCounter + 1;
     const name = el('input', { class: 'input', value: `Tela ${n}`, maxlength: 30 });
-    const content = { value: st.screenContent };
+    const content = { value: preset || st.screenContent };
     const contentPick = el('div', { class: 'choice-row' });
     const renderContent = () => {
       contentPick.replaceChildren(
         ...[
-          ['motion', '🎬', 'Filme / Jogo', 'Prioriza fluidez (fps)'],
+          ['movie', '🍿', 'Filme / Série', 'Som + imagem fluida, ótimo pra assistir junto'],
+          ['motion', '🎮', 'Jogo', 'Prioriza fluidez (fps)'],
           ['detail', '📝', 'Texto / Código', 'Prioriza nitidez'],
-        ].map(([id, e, t, d]) => el('button', { class: `choice ${content.value === id ? 'active' : ''}`, onclick: () => { content.value = id; renderContent(); } }, el('span', { class: 'choice-emoji' }, e), el('b', {}, t), el('small', {}, d)))
+        ].map(([id, e, t, d]) => el('button', { class: `choice ${content.value === id ? 'active' : ''}`, onclick: () => { content.value = id; renderContent(); if (id === 'movie') moviePreset(); } }, el('span', { class: 'choice-emoji' }, e), el('b', {}, t), el('small', {}, d)))
       );
     };
     renderContent();
+    // filme: 1080p a 30 fps (filmes são 24 fps; sobra banda para mais nitidez) e sempre com áudio
+    const moviePreset = () => {
+      res.value = '1080';
+      fps.value = '30';
+      audio.checked = true;
+      antiEcho.checked = true;
+    };
     const res = el('select', { class: 'input' }, ...Object.entries(SCREEN_RESOLUTIONS).map(([k, r]) => el('option', { value: k, selected: st.screenRes === k }, r.label)));
     const fps = el('select', { class: 'input' }, ...[15, 30, 60, 120].map((f) => el('option', { value: f, selected: Number(st.screenFps) === f }, `${f} fps${f === 120 ? ' (se o monitor/navegador suportar)' : ''}`)));
     const audio = el('input', { type: 'checkbox', checked: st.screenAudio });
     const antiEcho = el('input', { type: 'checkbox', checked: st.restrictOwnAudio });
+    if (preset === 'movie') moviePreset();
 
     const m = modal({
-      title: '🖥️ Compartilhar tela',
+      title: preset === 'movie' ? '🍿 Compartilhar um filme / série' : '🖥️ Compartilhar tela',
       wide: true,
       content: el('div', { class: 'share-dialog' },
         el('label', { class: 'field' }, el('span', {}, 'Nome da transmissão (aparece pra quem assiste)'), name),
@@ -715,10 +775,11 @@ export class CallController {
           label: 'Escolher o que compartilhar',
           primary: true,
           onClick: (c) => {
-            const opts = { name: name.value, res: res.value, fps: Number(fps.value), content: content.value, audio: audio.checked, restrictOwnAudio: antiEcho.checked };
-            updateSettings({ screenRes: opts.res, screenFps: opts.fps, screenContent: opts.content, screenAudio: opts.audio, restrictOwnAudio: opts.restrictOwnAudio });
+            const movie = content.value === 'movie';
+            const opts = { name: name.value, res: res.value, fps: Number(fps.value), content: movie ? 'motion' : content.value, audio: audio.checked, restrictOwnAudio: antiEcho.checked };
+            updateSettings({ screenRes: opts.res, screenFps: opts.fps, screenContent: content.value, screenAudio: opts.audio, restrictOwnAudio: opts.restrictOwnAudio });
             c();
-            this.startScreen(opts);
+            Promise.resolve(this.startScreen(opts)).then(() => movie && this.media.screens.size && this.enterWatchLayout());
           },
         },
       ],
@@ -937,13 +998,13 @@ export class CallController {
   // ---------- Controles somem quando o mouse fica parado ----------
   setupIdle() {
     let timer;
-    const wake = () => {
+    const wake = (this.wakeIdle = () => {
       this.wrap.classList.remove('idle');
       clearTimeout(timer);
       timer = setTimeout(() => {
         if (!this.controls.matches(':hover') && !document.querySelector('.ctx-menu')) this.wrap.classList.add('idle');
       }, 2600);
-    };
+    });
     this.wrap.addEventListener('pointermove', wake);
     this.wrap.addEventListener('pointerdown', wake);
     wake();

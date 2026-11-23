@@ -6,16 +6,20 @@ import { el, icon, avatar, store, save, onContext, IS_MOBILE } from '../ui.js';
 const MIN_PX = 90;
 
 export class Stage {
-  constructor(root, { onContext: onTileContext, onCoop } = {}) {
+  constructor(root, { onContext: onTileContext, onCoop, onWrapFullscreen } = {}) {
     this.root = root;
     this.onTileContext = onTileContext;
     this.onCoop = onCoop;
+    this.onWrapFullscreen = onWrapFullscreen;
     this.tiles = new Map();
     const saved = store('stage', {});
     this.layout = saved.layout || 'row';
     this.weights = saved.weights || {};
     this.floating = saved.floating || {};
     this.fit = saved.fit || {};
+    // layout Assistir: rostos em bolhas por cima do vídeo, numa coluna do lado ou escondidos
+    this.faces = saved.faces || 'bubbles';
+    this.facesPos = saved.facesPos || 'br';
     this.order = [];
     this.hidden = new Set();
     this.focusKey = null;
@@ -23,14 +27,28 @@ export class Stage {
     this.popouts = new Map();
     this.dock = el('div', { class: 'stage-dock' });
     this.floatLayer = el('div', { class: 'stage-float' });
+    this.facesLayer = el('div', { class: 'stage-faces hidden' });
     this.hiddenBar = el('div', { class: 'stage-hidden-bar hidden' });
-    root.append(this.dock, this.floatLayer, this.hiddenBar);
+    root.append(this.dock, this.facesLayer, this.floatLayer, this.hiddenBar);
     this.ro = new ResizeObserver(() => this.scheduleRender());
     this.ro.observe(root);
   }
 
   persist() {
-    save('stage', { layout: this.layout, weights: this.weights, floating: this.floating, fit: this.fit });
+    save('stage', { layout: this.layout, weights: this.weights, floating: this.floating, fit: this.fit, faces: this.faces, facesPos: this.facesPos });
+  }
+
+  setFaces(mode) {
+    this.faces = mode;
+    this.persist();
+    this.render();
+  }
+
+  setFacesPos(pos) {
+    this.facesPos = pos;
+    this.faces = 'bubbles';
+    this.persist();
+    this.render();
   }
 
   setLayout(l) {
@@ -140,6 +158,7 @@ export class Stage {
     const isCustom = info.kind === 'custom';
     const hasVideo = info.kind !== 'avatar' && !isCustom && info.stream;
     t.el.classList.toggle('is-custom', isCustom);
+    t.el.classList.toggle('is-watch', Boolean(info.watch));
     t.el.classList.toggle('is-avatar', !hasVideo && !isCustom);
     if (isCustom) info.render?.(t.custom);
     t.el.classList.toggle('is-screen', info.kind === 'screen');
@@ -216,7 +235,7 @@ export class Stage {
 
   setFocus(key) {
     this.focusKey = key;
-    if (this.layout !== 'focus') this.layout = 'focus';
+    if (this.layout !== 'focus' && this.layout !== 'watch') this.layout = 'focus';
     this.persist();
     this.render();
   }
@@ -282,6 +301,8 @@ export class Stage {
   fullscreen(key) {
     const t = this.tiles.get(key);
     if (!t) return;
+    // no layout Assistir a tela cheia é do palco inteiro (o vídeo, as bolhas de rosto e as reações)
+    if ((this.layout === 'watch' || t.info.watch) && this.onWrapFullscreen) return this.onWrapFullscreen();
     if (document.fullscreenElement === t.el) document.exitFullscreen().catch(() => {});
     else t.el.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
   }
@@ -363,7 +384,10 @@ export class Stage {
     this.dock.style.gridTemplateColumns = '';
 
     // tiles escondidos ficam fora do DOM
+    this.facesLayer.replaceChildren();
+    this.facesLayer.className = 'stage-faces hidden';
     for (const t of this.tiles.values()) {
+      t.el.classList.remove('face');
       t.el.classList.toggle('floating', Boolean(this.floating[t.key]));
       t.el.style.flex = '';
       t.el.style.left = t.el.style.top = t.el.style.width = t.el.style.height = '';
@@ -382,6 +406,34 @@ export class Stage {
       }
       this.dock.style.gridTemplateColumns = `repeat(${best}, 1fr)`;
       docked.forEach((k) => this.dock.append(this.tiles.get(k).el));
+    } else if (layout === 'watch' && docked.length) {
+      const main = this.watchMain(docked);
+      const others = docked.filter((k) => k !== main);
+      const mainEl = this.tiles.get(main).el;
+      const portrait = this.root.clientHeight > this.root.clientWidth;
+      if (this.faces === 'side' && others.length) {
+        this.dock.style.flexDirection = portrait ? 'column' : 'row';
+        mainEl.style.flex = `${this.weights.__wmain ?? 5} 1 0`;
+        mainEl.dataset.wkey = '__wmain';
+        const side = el('div', { class: 'stage-side faces-side', dataset: { wkey: '__wside' } });
+        side.style.flex = `${this.weights.__wside ?? 1} 1 0`;
+        side.style.flexDirection = portrait ? 'row' : 'column';
+        this.fillFlex(side, others, portrait ? 'row' : 'column');
+        others.forEach((k) => this.tiles.get(k).el.classList.add('face'));
+        this.dock.append(mainEl, this.gutter(mainEl, side, portrait ? 'column' : 'row'), side);
+      } else {
+        this.dock.style.flexDirection = 'row';
+        mainEl.style.flex = '1 1 0';
+        this.dock.append(mainEl);
+        if (this.faces === 'bubbles' && others.length) {
+          this.facesLayer.className = `stage-faces pos-${this.facesPos} n${Math.min(others.length, 6)}`;
+          for (const k of others) {
+            const t = this.tiles.get(k);
+            t.el.classList.add('face');
+            this.facesLayer.append(t.el);
+          }
+        }
+      }
     } else if (layout === 'focus' && docked.length > 1) {
       const main = docked.includes(this.focusKey) ? this.focusKey : docked.find((k) => this.tiles.get(k).info.kind === 'screen') || docked[0];
       const others = docked.filter((k) => k !== main);
@@ -419,6 +471,17 @@ export class Stage {
     this.hiddenBar.replaceChildren(
       el('button', { class: 'chip', onclick: () => this.showAll() }, `${hiddenCount} bloco(s) oculto(s) — mostrar`)
     );
+  }
+
+  // o que fica grande no layout Assistir: o que a pessoa focou, a sessão de vídeo ou a primeira tela compartilhada
+  watchMain(docked) {
+    if (this.focusKey && docked.includes(this.focusKey)) return this.focusKey;
+    if (docked.includes('watch')) return 'watch';
+    return docked.find((k) => this.tiles.get(k).info.kind === 'screen') || docked[0];
+  }
+
+  hasWatchContent() {
+    return [...this.tiles.values()].some((t) => t.info.watch || t.info.kind === 'screen');
   }
 
   fillFlex(container, keys, dir) {

@@ -74,6 +74,7 @@ export function renderChannels(app, box, { selectChannel, joinVoice, userMenu, o
   const voiceRow = (c) => {
     const parts = app.calls.get(c.id) || [];
     const music = app.music?.stateOf(c.id);
+    const watching = app.watch?.stateOf(c.id);
     const here = app.call.channelId === c.id;
     const live = parts.some((p) => Object.values(p.state?.streams || {}).some((s) => s.type === 'screen'));
     const row = el('div', { class: `channel voice ${here ? 'connected' : ''} ${c.id === cur ? 'active' : ''} ${!c.canEnter ? 'no-enter' : ''}`, onclick: () => joinVoice(c.id), dataset: { voiceChannel: c.id } },
@@ -118,6 +119,12 @@ export function renderChannels(app, box, { selectChannel, joinVoice, userMenu, o
         app.music.muted ? el('span', { class: 'vu-icons', title: 'KenBeat no mudo (só para você)' }, icon('volume-x', 13)) : music.pausedAt ? null : el('span', { class: 'eq' }, el('i'), el('i'), el('i')));
       onContext(botRow, (x, y) => app.music.openMenu(x, y, c.id));
       users.push(botRow);
+    }
+    if (watching?.current) {
+      // sessão de assistir junto: aparece na lista do canal (clique entra na call)
+      users.unshift(el('div', { class: 'voice-user bot watch-row', title: `Assistindo: ${watching.current.title} — clique para entrar e assistir junto`, onclick: (e) => { e.stopPropagation(); if (!here) joinVoice(c.id); } },
+        el('span', { class: 'bot-av' }, '🍿'),
+        el('span', { class: 'vu-name' }, el('b', {}, 'Assistindo '), el('small', {}, watching.pausedAt ? '⏸ ' : '▶ ', watching.current.title))));
     }
     return el('div', { class: 'voice-block' }, row, users.length ? el('div', { class: 'voice-users' }, users) : null);
   };

@@ -12,6 +12,7 @@ import { Home } from './home.js';
 import { renderChannels, renderMembers as renderMemberList, memberModItems, groupSettings, channelDialog, can } from './guild.js';
 import { Commands } from './commands.js';
 import { MusicClient } from './music.js';
+import { WatchClient } from './watch.js';
 
 const GROUP_ICONS = ['🎮', '🍿', '🎬', '🎧', '🔥', '⚡', '🌙', '👾', '🏆', '🐱', '✨', '🍕'];
 
@@ -137,6 +138,7 @@ function start(user) {
   app.call = new CallController(app);
   app.games = new GamesHub(app);
   app.music = new MusicClient(app);
+  app.watch = new WatchClient(app);
   app.commands = new Commands(app);
   app.renderAll = () => renderAll();
   app.joinVoice = (cid) => joinVoice(cid);

@@ -93,6 +93,10 @@ const P = {
   pause: '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>',
   shuffle: '<path d="M2 18h3.3a4 4 0 0 0 3.3-1.8l6.8-10.4A4 4 0 0 1 18.7 4H22M2 6h3.3a4 4 0 0 1 3.2 1.6M22 20h-3.3a4 4 0 0 1-3.2-1.6"/><path d="m18 2 4 2-4 2M18 18l4 2-4 2"/>',
   repeat: '<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
+  list: '<path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/>',
+  rewind: '<path d="M11 19 2 12l9-7v14Z"/><path d="M22 19l-9-7 9-7v14Z"/>',
+  forward: '<path d="M13 19l9-7-9-7v14Z"/><path d="M2 19l9-7-9-7v14Z"/>',
+  'smile-plus': '<path d="M22 11v1a10 10 0 1 1-9-10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01M15 9h.01"/><path d="M16 5h6M19 2v6"/>',
 };
 
 export function icon(name, size = 20) {

@@ -95,7 +95,7 @@ export class AudioOut {
   applyGain(e) {
     let v;
     if (this.userMute[e.userId]) v = 0;
-    else if (e.kind === 'screen') v = this.streamVol.get(e.screenId) ?? 1;
+    else if (e.kind === 'screen') v = (this.streamVol.get(e.screenId) ?? 1) * (this.duck ?? 1);
     else v = this.userVol[e.userId] ?? 1;
     if (this.elementMode) {
       e.el.volume = Math.max(0, Math.min(1, v)); // <audio> vai até 100%
@@ -131,6 +131,12 @@ export class AudioOut {
   setStreamVolume(screenId, v) {
     this.streamVol.set(screenId, v);
     this.applyAll();
+  }
+  // abaixa o som das telas compartilhadas enquanto alguém fala (filme na call)
+  setDuck(v) {
+    if (this.duck === v) return;
+    this.duck = v;
+    for (const e of this.tracks.values()) if (e.kind === 'screen') this.applyGain(e);
   }
   hasStreamAudio(screenId) {
     for (const e of this.tracks.values()) if (e.screenId === screenId && e.kind === 'screen') return true;

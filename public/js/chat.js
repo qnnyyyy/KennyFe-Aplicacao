@@ -222,6 +222,7 @@ export class Chat {
   renderBot(m) {
     const d = this.botData(m) || { text: m.content };
     const music = d.bot === 'music';
+    const watch = d.bot === 'watch';
     if (d.bot === 'me') {
       return el('div', { class: 'msg action', dataset: { mid: m.id } }, el('span', { class: 'sys-ic' }, '✦'), el('i', {}, el('b', { style: { color: nameColor(this.app, this.app.group(m.groupId), m.author) } }, m.author?.displayName || ''), ' ', d.text), el('time', {}, formatTime(m.createdAt)));
     }
@@ -229,14 +230,16 @@ export class Chat {
     if (d.text) body.append(el('div', { class: 'msg-text', html: renderText((d.mention ? `@${this.app.userName(d.mention)} ` : '') + d.text) }));
     if (d.track) {
       const t = d.track;
-      body.append(el('a', { class: `track-card ${d.kind || ''}`, href: `https://www.youtube.com/watch?v=${t.videoId}`, target: '_blank', rel: 'noopener noreferrer' },
+      body.append(el('a', { class: `track-card ${d.kind || ''}`, href: t.url || `https://www.youtube.com/watch?v=${t.videoId}`, target: '_blank', rel: 'noopener noreferrer' },
         el('img', { src: t.thumb, loading: 'lazy', alt: '' }),
         el('div', { class: 'track-info' }, el('b', {}, t.title), el('small', {}, [t.author, t.duration ? fmtDur(t.duration) : null, t.by ? `pedida por ${t.by.name}` : null].filter(Boolean).join(' • ')), d.extra ? el('small', { class: 'muted' }, d.extra) : null)));
     }
-    const node = el('div', { class: `msg bot ${music ? 'music' : ''}`, dataset: { mid: m.id } },
-      el('div', { class: 'bot-av' }, music ? '🎧' : '✨'),
+    if (watch && d.channelId && !(this.app.call.active && this.app.call.channelId === d.channelId) && this.app.watch?.stateOf(d.channelId))
+      body.append(el('button', { class: 'btn btn-primary btn-sm watch-join', onclick: () => this.app.joinVoice(d.channelId) }, '🍿 Entrar e assistir junto'));
+    const node = el('div', { class: `msg bot ${music ? 'music' : ''} ${watch ? 'watch' : ''}`, dataset: { mid: m.id } },
+      el('div', { class: 'bot-av' }, music ? '🎧' : watch ? '🍿' : '✨'),
       el('div', { class: 'msg-main' },
-        el('div', { class: 'msg-head' }, el('b', { class: 'bot-name' }, music ? 'KenBeat' : 'Kenfeh'), el('span', { class: 'bot-tag' }, 'BOT'), el('small', { class: 'bot-by' }, `usado por ${m.author?.displayName || '?'}`), el('time', {}, formatTime(m.createdAt))),
+        el('div', { class: 'msg-head' }, el('b', { class: 'bot-name' }, music ? 'KenBeat' : watch ? 'Sessão' : 'Kenfeh'), el('span', { class: 'bot-tag' }, 'BOT'), el('small', { class: 'bot-by' }, `usado por ${m.author?.displayName || '?'}`), el('time', {}, formatTime(m.createdAt))),
         body));
     onContext(node, (x, y) => this.messageMenu(m, x, y));
     return node;

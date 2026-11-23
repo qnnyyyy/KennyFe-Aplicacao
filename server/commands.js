@@ -4,6 +4,7 @@ const guild = require('./guild');
 const stats = require('./stats');
 const { isMember, createMessage } = require('./routes');
 const { attachMusic } = require('./music');
+const { attachWatch } = require('./watch');
 
 const GAME_ALIASES = { tetris: 'tetris', velha: 'tictactoe', 'jogo-da-velha': 'tictactoe', lig4: 'connect4', 'lig-4': 'connect4', desenho: 'draw', gartic: 'draw', reflexo: 'reaction' };
 const BALL = ['Com certeza! ✅', 'Pode apostar 😎', 'Sem dúvida.', 'Sim!', 'Os astros dizem que sim ✨', 'Talvez… 🤔', 'Pergunta de novo depois.', 'Melhor não te contar agora 🙊', 'Não conta com isso.', 'Minhas fontes dizem que não.', 'Nem a pau 😂', 'Muito duvidoso.'];
@@ -11,6 +12,7 @@ const BALL = ['Com certeza! ✅', 'Pode apostar 😎', 'Sem dúvida.', 'Sim!', '
 // grupo: só para organizar a lista; perm: precisa dessa permissão; client: o navegador resolve sozinho
 const COMMANDS = [
   { name: 'botmusic', aliases: ['play', 'tocar', 'musica', 'p'], args: '<link do YouTube ou nome>', desc: 'O KenBeat 🎧 entra na sua call e toca a música', perm: 'music', group: 'Música' },
+  { name: 'assistir', aliases: ['watch', 'filme', 'video', 'sessao'], args: '<link do YouTube, de um .mp4 ou nome>', desc: '🍿 Assiste um vídeo junto com a call, no mesmo ponto pra todo mundo', group: 'Assistir junto' },
   { name: 'pular', aliases: ['skip', 'next', 's'], desc: 'Pula para a próxima música', perm: 'music', group: 'Música' },
   { name: 'pausar', aliases: ['pause'], desc: 'Pausa a música', perm: 'music', group: 'Música' },
   { name: 'continuar', aliases: ['resume', 'despausar'], desc: 'Continua de onde parou', perm: 'music', group: 'Música' },
@@ -57,9 +59,15 @@ function attachCommands(io, hub, { createGame } = {}) {
     return msg;
   };
   const music = attachMusic(io, hub, { postBot });
+  const watch = attachWatch(io, hub, { postBot });
   const reminders = new Set();
 
   const handlers = {
+    async assistir(c) {
+      const r = await watch.play(c.userId, c.args, { textChannelId: c.channelId, socket: c.socket });
+      if (r.queued) return { ephemeral: r.added > 1 ? `🍿 ${r.added} vídeos foram para a fila da sessão.` : `🍿 **${r.queued.title}** entrou na fila (#${r.position}).` };
+      return null;
+    },
     async botmusic(c) {
       const r = await music.play(c.userId, c.groupId, c.channelId, c.args);
       const chName = `${r.channel.emoji || '🔊'} ${r.channel.name}`;

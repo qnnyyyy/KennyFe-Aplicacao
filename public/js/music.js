@@ -13,7 +13,7 @@ const fmt = (s) => {
 };
 
 let apiPromise = null;
-function loadYouTube() {
+export function loadYouTube() {
   if (window.YT?.Player) return Promise.resolve(window.YT);
   apiPromise ||= new Promise((resolve, reject) => {
     const prev = window.onYouTubeIframeAPIReady;

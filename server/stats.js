@@ -59,11 +59,14 @@ const FEATURES = {
   command: 'Usou comandos com /',
   music_play: 'Pediu música (KenBeat)',
   music_skip: 'Pulou música',
+  watch_start: 'Começou sessão de assistir junto',
+  watch_react: 'Reagiu na sessão',
+  watch_layout: 'Usou o layout Assistir',
   poll_create: 'Criou enquete',
   poll_vote: 'Votou em enquete',
 };
 // o que o navegador pode registrar sozinho (o resto o servidor já conta)
-const CLIENT_FEATURES = new Set(['soundboard', 'clip', 'cinema', 'coop_guest']);
+const CLIENT_FEATURES = new Set(['soundboard', 'clip', 'cinema', 'coop_guest', 'watch_layout']);
 
 // dia no horário de Brasília (o servidor pode estar em outro fuso)
 const dayOf = (ms = Date.now()) => new Date(ms - 3 * 3600e3).toISOString().slice(0, 10);

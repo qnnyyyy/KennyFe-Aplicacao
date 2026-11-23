@@ -334,4 +334,4 @@ function attachMusic(io, hub, { postBot }) {
   return api;
 }
 
-module.exports = { attachMusic, parseYouTube, BOT };
+module.exports = { attachMusic, parseYouTube, resolve, BOT };
