@@ -93,7 +93,16 @@ REGISTER_CODE=qualquer-codigo-secreto
 
 A tela de cadastro passa a pedir esse código. Quem já tem conta continua entrando normal. O login também tem limite de tentativas contra quem tenta adivinhar senha.
 
-## Atualizar o site
+## Atualizar o site no servidor (Magalu Cloud)
+
+Dê dois cliques em **`atualizar-servidor.bat`** no seu PC. Ele:
+1. baixa a versão nova do GitHub nesta pasta;
+2. empacota o site (sem `node_modules`, `data/` e `.env`) e manda para o servidor por SSH;
+3. troca os arquivos no servidor e reinicia **só o Kenfeh** (pm2, systemd ou processo solto), sem derrubar outros sites da máquina, como o Dokai.
+
+Na primeira vez ele confirma o IP, o usuário e a chave SSH (o padrão é a mesma máquina e a mesma chave `.ssh\dokai` do Dokai) e guarda isso em `servidor.cfg`, que fica só no seu PC. Contas, mensagens, uploads e o `.env` do servidor não são tocados.
+
+## Atualizar o site (rodando no notebook)
 
 ```powershell
 git pull
